@@ -22,6 +22,10 @@ const read = () => {
 };
 
 beforeEach(async () => {
+  if (!process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_AUTH_EMULATOR_HOST
+    || (process.env.GCLOUD_PROJECT || app.options.projectId) !== 'demo-so-cong-dau') {
+    throw new Error('Refusing to wipe data: not running against the emulators for demo-so-cong-dau.');
+  }
   const all = await auth.listUsers(1000);
   await auth.deleteUsers(all.users.map((u) => u.uid));
   for (const c of ['people', 'orders']) {
@@ -97,8 +101,11 @@ describe('accounts', () => {
   });
 
   test('add undoes the login if the people row cannot be written', async () => {
-    const broken = { ...db, doc: () => ({ set: async () => { throw new Error('boom'); } }) };
-    await expect(addPerson({ ...ctx(), db: broken }, 'Bác Khang')).rejects.toThrow();
+    const broken = new Proxy(db, { get: (t, k) => (k === 'doc' ? () => ({ set: async () => { throw new Error('boom'); } }) : Reflect.get(t, k)) });
+    let created = 0;
+    const authSpy = new Proxy(auth, { get: (t, k) => (k === 'createUser' ? async (...a) => { created++; return t.createUser(...a); } : Reflect.get(t, k).bind?.(t) ?? Reflect.get(t, k)) });
+    await expect(addPerson({ ...ctx(), auth: authSpy, db: broken }, 'Bác Khang')).rejects.toThrow(/Không tạo được/);
+    expect(created).toBe(1);
     expect((await auth.listUsers()).users.length).toBe(0);
   });
 
@@ -120,6 +127,21 @@ describe('accounts', () => {
     expect((await db.collection('people').get()).size).toBe(0);
     expect((await db.doc('orders/o1').get()).exists).toBe(true);
     expect(read()).toEqual([]);
+  });
+
+  test('remove still finishes when the login is already gone', async () => {
+    await addPerson(ctx(), 'Bác Khang');
+    const u = await auth.getUserByEmail('bac-khang@so-cong-dau.invalid');
+    await auth.deleteUser(u.uid);
+    await removePerson(ctx(), 'Bác Khang');
+    expect((await db.collection('people').get()).size).toBe(0);
+  });
+
+  test('remove keeps the people row if the login cannot be deleted', async () => {
+    await addPerson(ctx(), 'Bác Khang');
+    const failing = new Proxy(auth, { get: (t, k) => (k === 'deleteUser' ? async () => { throw new Error('boom'); } : Reflect.get(t, k).bind(t)) });
+    await expect(removePerson({ ...ctx(), auth: failing }, 'Bác Khang')).rejects.toThrow();
+    expect((await db.collection('people').get()).size).toBe(1);
   });
 
   test('remove of the owner needs confirm', async () => {

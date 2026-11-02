@@ -92,7 +92,7 @@ export async function resetPin(ctx, rawName) {
   const person = await findByName(db, name);
   if (!person) throw new PlainError(`Không có người tên "${name}".`);
   const pin = await askNewPin(ctx);
-  // Tokens are not revoked: that could sign people out and break offline use.
+  // Firebase itself revokes refresh tokens when a password changes, so the person's other devices must sign in again with the new PIN.
   await auth.updateUser(person.uid, { password: pin });
 }
 
@@ -104,12 +104,12 @@ export async function removePerson(ctx, rawName, { confirmOwner = false } = {}) 
   if (person.role === 'owner' && !confirmOwner) {
     throw new PlainError(`"${name}" là chủ. Nếu thật sự muốn xoá, thêm --confirm-owner vào cuối lệnh.`);
   }
-  await db.doc(`people/${person.uid}`).delete();
   try {
     await auth.deleteUser(person.uid);
   } catch (e) {
     if (e.code !== 'auth/user-not-found') throw e;
   }
+  await db.doc(`people/${person.uid}`).delete();
   await writePeopleList(db, peopleListPath);
 }
 

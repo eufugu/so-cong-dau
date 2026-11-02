@@ -784,7 +784,7 @@
     const prevDays = new Date(now.getFullYear(), now.getMonth(), 0).getDate();
     const cmp = !prevRev ? `Tháng ${mo(prev)} chưa có số để so.`
       : `${day < prevDays ? `<span class="nw">Tháng ${mo(prev)} tới ngày ${day}: ${prevSoFar ? num(prevSoFar) : "chưa bán"}</span> ` : ""}<span class="nw">Cả tháng ${mo(prev)}: ${num(prevRev)}</span>`;
-    return `<a class="total rev-total" href="${isOwner() ? "#/baocao" : "#/don"}"><span>Doanh thu tháng ${mo(month)}</span><b>${rev ? num(rev) : NONE}</b><small>${cmp}</small></a>`;
+    return `<a class="total rev-total" href="#/baocao"><span>Doanh thu tháng ${mo(month)}</span><b>${rev ? num(rev) : NONE}</b><small>${cmp}</small></a>`;
   }
 
   function viewHome() {
@@ -819,9 +819,10 @@
     return `<div class="calm">` + band({
       title: `${WEEKDAY[now.getDay()]}, ${dm(today())}`,
       sub: `Âm lịch <b>${l.day}/${l.month}${l.leap ? " nhuận" : ""}</b> ${Lunar.yearName(l.year)}${holyText}`,
-      totals: revenueCard(),
+      // Doanh thu chỉ Mẹ xem
+      totals: isOwner() ? revenueCard() : "",
     }) + `
-    ${revenueChart()}
+    ${isOwner() ? revenueChart() : ""}
     <div class="actions"><a class="btn primary" href="#/sx">${ICON.plus}${isOwner() ? "Ghi sản xuất" : "Ghi sản xuất hôm nay"}</a></div>
     <h2 class="sec">Thông tin</h2>
     <ul class="ledger">

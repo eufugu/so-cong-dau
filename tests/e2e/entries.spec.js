@@ -406,3 +406,14 @@ test('text size survives sign-out', async ({ page }) => {
   await expect(page.getByLabel('Mã PIN')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.style.fontSize)).toBe('125%');
 });
+
+test('only Mẹ sees revenue on Hôm nay', async ({ page, browser, baseURL }) => {
+  await openAs(page, WORKER);
+  await page.goto('/#/');
+  await expect(page.getByRole('link', { name: /Ghi sản xuất hôm nay/ })).toBeVisible();
+  await expect(page.getByText('Doanh thu', { exact: false })).toHaveCount(0);
+  const mom = await otherPhone(browser, baseURL, OWNER);
+  await mom.page.goto('/#/');
+  await expect(mom.page.getByText(/Doanh thu tháng/)).toBeVisible();
+  await expect(mom.page.getByRole('heading', { name: /Doanh thu 7 ngày/ })).toBeVisible();
+});

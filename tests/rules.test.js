@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, deleteDoc, setLogLevel } from 'firebase/firestore';
 import { afterAll, beforeAll, beforeEach, describe, test } from 'vitest';
 
 const OWNER = 'Mẹ Liên';
@@ -8,6 +8,8 @@ const THANH = 'Bác Khang';
 const LAN = 'Lan';
 const DATA = ['customers', 'orders', 'payments', 'production', 'purchases', 'batches', 'losses', 'supplierPays'];
 const OWN_ROW = ['orders', 'production', 'purchases', 'batches', 'losses'];
+
+setLogLevel('error');
 
 let env;
 const as = (uid) => env.authenticatedContext(uid).firestore();
@@ -88,6 +90,7 @@ describe('reading and people', () => {
 
   test('settings is denied to everyone, even the owner', async () => {
     await assertFails(setDoc(doc(owner(), 'settings/x'), { a: 1 }));
+    await assertFails(setDoc(doc(khang(), 'settings/x'), { a: 1 }));
     await assertFails(getDoc(doc(owner(), 'settings/x')));
     await assertFails(getDoc(doc(khang(), 'settings/x')));
   });
@@ -99,12 +102,12 @@ describe('reading and people', () => {
 
 describe('worker creates', () => {
   test.each([...OWN_ROW, 'payments'])('worker can create %s with by = own name', async (c) => {
-    const data = c === 'payments' ? pay(THANH) : row(THANH);
+    const data = c === 'payments' ? pay(THANH) : c === 'orders' ? row(THANH, { status: 'Đã giao' }) : row(THANH);
     await assertSucceeds(setDoc(doc(khang(), `${c}/n`), data));
   });
 
   test.each([...OWN_ROW, 'payments'])('worker cannot create %s with by = the owner', async (c) => {
-    const data = c === 'payments' ? pay(OWNER) : row(OWNER);
+    const data = c === 'payments' ? pay(OWNER) : c === 'orders' ? row(OWNER, { status: 'Đã giao' }) : row(OWNER);
     await assertFails(setDoc(doc(khang(), `${c}/n`), data));
   });
 
@@ -118,6 +121,39 @@ describe('worker creates', () => {
 
   test('worker cannot create with by in NFD form', async () => {
     await assertFails(setDoc(doc(khang(), 'orders/n'), row(THANH.normalize('NFD'))));
+  });
+
+  test.each([...OWN_ROW, 'payments', 'customers'])('worker cannot create %s with void other than false', async (c) => {
+    for (const v of [true, 1, 'true', 'x']) {
+      const data = { ...(c === 'payments' ? pay(THANH) : row(THANH, { status: 'Đã giao' })), void: v };
+      await assertFails(setDoc(doc(khang(), `${c}/n`), data));
+    }
+  });
+
+  test('worker can create with void absent', async () => {
+    const { void: _v, ...rest } = row(THANH, { status: 'Đã giao' });
+    await assertSucceeds(setDoc(doc(khang(), 'orders/n'), rest));
+  });
+
+  test('worker order create needs status Đã giao', async () => {
+    await assertFails(setDoc(doc(khang(), 'orders/n'), row(THANH)));
+    await assertFails(setDoc(doc(khang(), 'orders/n'), row(THANH, { status: 'Hủy' })));
+  });
+
+  test('worker create using the real payment shape from the app is allowed', async () => {
+    const real = { id: 'p9', date: 'd', customerId: 'c1', customer: 'A', amount: 5, method: 'TM', holder: THANH,
+      handed: false, handedDate: null, by: THANH, void: false, createdAt: 1 };
+    await assertSucceeds(setDoc(doc(khang(), 'payments/n'), real));
+    await assertSucceeds(setDoc(doc(khang(), 'payments/m'), { ...real, holder: 'Tài khoản Mẹ', handed: true, handedDate: 'd' }));
+  });
+
+  test('worker cannot overwrite another persons existing row with setDoc', async () => {
+    await seed('orders/r', row(THANH, { status: 'Đã giao' }));
+    await assertFails(setDoc(doc(lan(), 'orders/r'), row(LAN, { status: 'Đã giao' })));
+    await seed('payments/p', pay(THANH));
+    await assertFails(setDoc(doc(lan(), 'payments/p'), pay(LAN)));
+    await seed('production/q', row('Excel'));
+    await assertFails(setDoc(doc(lan(), 'production/q'), row(LAN)));
   });
 
   test('worker create into supplierPays is refused', async () => {
@@ -198,8 +234,11 @@ describe('worker payments', () => {
     await assertFails(setDoc(doc(khang(), 'payments/n'), pay(THANH, { alloc: [{ date: 'd', amount: 1 }] })));
   });
 
-  test('create with void true is refused', async () => {
-    await assertFails(setDoc(doc(khang(), 'payments/n'), pay(THANH, { void: true })));
+  test('create with a truthy but non-true handed is refused', async () => {
+    for (const h of [1, 'true', 'x']) {
+      await assertFails(setDoc(doc(khang(), 'payments/n'), pay(THANH, { holder: OWNER, handed: h, handedDate: 'd' })));
+      await assertFails(setDoc(doc(khang(), 'payments/n'), pay(THANH, { holder: 'Tài khoản Mẹ', handed: h })));
+    }
   });
 
   test('cannot set handed true on an existing payment', async () => {
@@ -253,6 +292,16 @@ describe('worker payments', () => {
     await assertFails(deleteDoc(doc(lan(), 'payments/p')));
   });
 
+  test('cannot delete own payment already counted as received without handedBy', async () => {
+    await seed('payments/p', pay(LAN, { holder: OWNER, handed: true }));
+    await assertFails(deleteDoc(doc(lan(), 'payments/p')));
+  });
+
+  test('can delete own bank payment to Tài khoản Mẹ with no handedBy', async () => {
+    await seed('payments/p', pay(LAN, { holder: 'Tài khoản Mẹ', handed: true }));
+    await assertSucceeds(deleteDoc(doc(lan(), 'payments/p')));
+  });
+
   test('cannot delete another persons payment', async () => {
     await seed('payments/p', pay(THANH));
     await assertFails(deleteDoc(doc(lan(), 'payments/p')));
@@ -267,6 +316,9 @@ describe('worker payments', () => {
     await seed('payments/p', pay(LAN));
     await assertFails(updateDoc(doc(lan(), 'payments/p'), { void: true, voidBy: LAN }));
     await assertFails(updateDoc(doc(lan(), 'payments/p'), { alloc: [{ date: 'd', amount: 1 }] }));
+    await seed('payments/q', pay(THANH));
+    await assertFails(updateDoc(doc(lan(), 'payments/q'), { void: true, voidBy: LAN }));
+    await assertFails(updateDoc(doc(lan(), 'payments/q'), { alloc: [{ date: 'd', amount: 1 }] }));
   });
 });
 
@@ -293,6 +345,12 @@ describe('customerId backfill', () => {
     await assertFails(updateDoc(doc(lan(), `${c}/r`), { customerId: 'c9', amount: 5 }));
   });
 
+  test.each([5, true, null, ['c9']])('backfill value must be a string (%s)', async (v) => {
+    const { customerId, ...rest } = pay(THANH);
+    await seed('orders/r', rest);
+    await assertFails(updateDoc(doc(lan(), 'orders/r'), { customerId: v }));
+  });
+
   test('backfill is not allowed on other collections', async () => {
     await seed('production/r', row(THANH));
     await assertFails(updateDoc(doc(lan(), 'production/r'), { customerId: 'c9' }));
@@ -301,8 +359,21 @@ describe('customerId backfill', () => {
 
 describe('customers and supplierPays', () => {
   test('worker can create and update customers', async () => {
-    await assertSucceeds(setDoc(doc(khang(), 'customers/c1'), { id: 'c1', name: 'A', phone: '1' }));
+    await assertSucceeds(setDoc(doc(khang(), 'customers/c1'), { id: 'c1', name: 'A', phone: '1', address: '', note: '', by: THANH, void: false, createdAt: 1 }));
     await assertSucceeds(updateDoc(doc(lan(), 'customers/c1'), { name: 'B', phone: '2', address: 'x' }));
+  });
+
+  test('worker cannot create a customer under another name or with extra fields', async () => {
+    await assertFails(setDoc(doc(khang(), 'customers/c1'), { id: 'c1', name: 'A', by: OWNER }));
+    await assertFails(setDoc(doc(khang(), 'customers/c1'), { id: 'c1', name: 'A', by: THANH, debt: 5 }));
+  });
+
+  test('worker cannot update customer by, void or other fields', async () => {
+    await seed('customers/c1', { id: 'c1', name: 'A', by: THANH, void: false });
+    await assertFails(updateDoc(doc(lan(), 'customers/c1'), { by: OWNER }));
+    await assertFails(updateDoc(doc(lan(), 'customers/c1'), { void: true }));
+    await assertFails(updateDoc(doc(lan(), 'customers/c1'), { by: OWNER, void: true, debt: 5 }));
+    await assertFails(updateDoc(doc(lan(), 'customers/c1'), { name: 'B', debt: 5 }));
   });
 
   test('worker can update a customer that has no by', async () => {

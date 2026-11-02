@@ -535,3 +535,15 @@ test('Báo cáo: month picker, the two cards, press a slice to read it, and a fr
   await expect(page.locator('#pie-detail')).toContainText('90% doanh thu · 3 thùng');
   await expect(page.locator('.slice.on')).toHaveCount(1);
 });
+
+test('the font comes from the app itself, never from another site', async ({ page }) => {
+  const outside = [];
+  page.on('request', (r) => { if (/font|\.woff/.test(r.url()) && !r.url().startsWith('http://127.0.0.1:5000/')) outside.push(r.url()); });
+  await page.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.abort());
+  await openAs(page, WORKER);
+  await page.evaluate(() => document.fonts.ready);
+  const loaded = await page.evaluate(() => [...document.fonts].filter((f) => f.status === 'loaded').map((f) => f.family.replace(/"/g, '')));
+  expect(loaded.length).toBeGreaterThan(0);
+  expect(new Set(loaded)).toEqual(new Set(['Be Vietnam Pro']));
+  expect(outside).toEqual([]);
+});

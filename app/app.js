@@ -1560,7 +1560,7 @@
       return { ...x, share, from, to, pct: share < 0.005 ? "<1" : String(Math.round(share * 100)) };
     });
   }
-  // Bánh vòng nổi: mặt trên là vành elip; thành ngoài thấy ở nửa trước, thành trong thấy ở nửa sau qua lỗ giữa; lõi xám lộ ra khi nhấc một miếng lên
+  // Bánh vòng nổi: mặt trên là vành elip; thành ngoài thấy ở nửa trước, thành trong thấy ở nửa sau qua lỗ giữa
   const PIE_BOX = { w: 343, h: 240, cx: 171.5, cy: 102, rx: 150, ry: 84, depth: 38, hole: 0.44 };
   function pieSvg(slices, active) {
     const { w, h, cx, cy, rx, ry, depth, hole } = PIE_BOX, irx = rx * hole, iry = ry * hole;
@@ -1573,8 +1573,6 @@
     const cut = (t) => `M${inn(t)} L${out(t)} L${out(t, depth)} L${inn(t, depth)} Z`;
     const shaded = (cls, d, extra = "") => `<path class="${cls}" d="${d}"${extra}/><path class="${cls}-shade pie-shade" d="${d}"${extra}/>`;
     const clip = ' clip-path="url(#pie-hole)"';
-    // Vạch trắng chỉ nằm giữa hai miếng, trên mặt bánh và xuôi theo thành; viền ngoài để trơn
-    const gap = (t) => `<path class="pie-gap" d="M${inn(t)} L${out(t)}${Math.sin(t) > 0 ? ` L${out(t, depth)}` : ""}"/>${Math.sin(t) < 0 ? `<path class="pie-gap" d="M${inn(t)} L${inn(t, depth)}"${clip}/>` : ""}`;
     const piece = (x) => {
       const mid = (x.from + x.to) / 2, big = x.to - x.from > Math.PI;
       const f0 = Math.max(x.from, 0), f1 = Math.min(x.to, Math.PI);
@@ -1586,17 +1584,12 @@
         ${shaded("pie-cut", cut(x.from))}${shaded("pie-cut", cut(x.to))}
         ${f1 > f0 ? shaded("pie-out", wallOut(f0, f1)) : ""}
         <path class="pie-top" d="M${out(x.from)} ${arcOut(x.to, big, 1)} L${inn(x.to)} ${arcIn(x.from, big, 0)} Z"/>
-        ${slices.length > 1 ? [x.from, x.to].map(gap).join("") : ""}
         ${x.share >= 0.06 ? `<text class="pie-pct${x.tone[1] ? " ink" : ""}" x="${lx.toFixed(1)}" y="${ly.toFixed(1)}">${x.pct}%</text>` : ""}
       </g>`;
     };
     const order = [...slices.filter((x) => x.code !== active), ...slices.filter((x) => x.code === active)];
-    // Lõi nhỏ hơn bánh một chút, để không lộ thành viền quanh mép bánh
-    const crx = rx - 2, cry = ry - 2, cd = depth - 2, hrx = irx + 2, hry = iry + 2;
     return `<svg viewBox="0 0 ${w} ${h}" aria-hidden="true" focusable="false">
       <defs><clipPath id="pie-hole"><ellipse cx="${cx}" cy="${cy}" rx="${irx.toFixed(1)}" ry="${iry.toFixed(1)}"/></clipPath></defs>
-      <path class="pie-core-wall" d="M${cx - crx} ${cy} A${crx} ${cry} 0 0 0 ${cx + crx} ${cy} L${cx + crx} ${cy + cd} A${crx} ${cry} 0 0 1 ${cx - crx} ${cy + cd} Z"/>
-      <path class="pie-core" fill-rule="evenodd" d="M${cx - crx} ${cy} A${crx} ${cry} 0 1 0 ${cx + crx} ${cy} A${crx} ${cry} 0 1 0 ${cx - crx} ${cy} Z M${cx - hrx} ${cy} A${hrx} ${hry} 0 1 0 ${cx + hrx} ${cy} A${hrx} ${hry} 0 1 0 ${cx - hrx} ${cy} Z"/>
       <g class="pie-slices">${order.map(piece).join("")}</g>
     </svg>`;
   }

@@ -408,3 +408,9 @@ table.stock tr:last-child td { border-bottom: 0; }
 
 /* Sản xuất: the oil hint keeps two lines of room so Lưu never moves under the thumb */
 #sx-hint { margin: 0; line-height: 1.4; min-height: 2.8em; }
+
+/* Màn đăng nhập: chưa đăng nhập thì không có thanh trang */
+.gated .tabs { display: none; }
+.gated main { padding-bottom: 24px; }
+.gate-wait { margin: 0; padding: 40px 16px; text-align: center; color: var(--ink-2); font-size: 1.1rem; }
+.input.pin { font-size: 1.6rem; font-weight: 700; letter-spacing: 0.3em; color: var(--pen); text-align: center; }

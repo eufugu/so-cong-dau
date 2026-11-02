@@ -1,6 +1,6 @@
 // Lưu sẵn app trên máy: có mạng thì lấy bản mới, mất mạng thì mở bản đã lưu
-const CACHE = "so-cong-dau-v1";
-const FILES = ["./", "index.html", "styles.css", "app.js", "lunar.js", "seed.js", "manifest.webmanifest", "icon.svg", "icon-180.png", "icon-192.png"];
+const CACHE = "so-cong-dau-v2";
+const FILES = ["./", "index.html", "styles.css", "app.js", "lunar.js", "seed.js", "backend.js", "firebase-config.js", "people-list.js", "manifest.webmanifest", "icon.svg", "icon-180.png", "icon-192.png"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES)).then(() => self.skipWaiting()));

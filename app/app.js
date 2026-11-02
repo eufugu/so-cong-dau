@@ -65,19 +65,15 @@
     return fromSeed(window.SEED);
   }
 
-  // Sổ chung: trên trang claude.ai, các dòng ghi nằm ở một kho dữ liệu chung cho cả nhà
+  // Sổ chung: khi có kết nối (window.soBackend), các dòng ghi nằm ở một kho dữ liệu chung cho cả nhà
   const SHARED = ["customers", "orders", "payments", "production", "purchases", "batches", "losses", "supplierPays"];
   const REMOTE_KEY = KEY + ".chung";
   const UNSENT_KEY = KEY + ".cho-gui";
-  const canShare = !!(window.claude && window.claude.use);
+  const canShare = !!window.soBackend;
   let remote = null;          // kho chung, khi đã kết nối
   let sync = canShare ? "loading" : "local";  // local | loading | live | stale | readonly
   const mirror = {};          // bản đã có trên kho chung: col -> Map(id -> json)
   const arrived = new Set();  // các mục đã nhận bản đầy đủ từ kho chung
-  // settings/owner: tài khoản của Mẹ. Giữ bản tạm để mất mạng vẫn nhận ra máy của Mẹ.
-  const SETTINGS_KEY = KEY + ".cai-dat";
-  let settings = {}, settingsReady = false;
-  try { const s = localStorage.getItem(SETTINGS_KEY); if (s) { settings = JSON.parse(s); settingsReady = true; } } catch (e) { settings = {}; }
   const shared = () => canShare && sync !== "local";
 
   // Dòng mới ghi khi chưa có mạng: giữ trong máy, có mạng thì tự gửi
@@ -177,13 +173,6 @@
         later();
       }, () => { sync = "stale"; render(); });
     });
-    store.collection("settings").onSnapshot((snap) => {
-      settings = {};
-      snap.docs.forEach((d) => { settings[d.id] = d.data(); });
-      settingsReady = true;
-      try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) { /* chỉ là bản tạm */ }
-      fixUser(); later(); setTimeout(maybeAsk, 0);
-    }, () => { settingsReady = true; setTimeout(maybeAsk, 0); });
   }
   document.addEventListener("focusout", () => setTimeout(() => { if (renderLater && !editing()) { renderLater = false; render(); } }, 0));
   // Ghi dòng mới thì lúc nào cũng được (chưa có mạng thì để dành gửi sau).
@@ -428,23 +417,88 @@
   const madeOn = (d) => live(db.production).filter((x) => x.date === d);
 
   // ---------- Người dùng ----------
-  // Quyền của Mẹ (hủy hoá đơn, xác nhận nhận tiền, sửa giá, xem báo cáo) đi theo tài khoản Claude của Mẹ,
-  // không theo tên tự chọn. Chưa chọn tài khoản của Mẹ thì người tạo trang giữ quyền đó.
+  // Quyền của Mẹ (hủy hoá đơn, xác nhận nhận tiền, sửa giá, xem báo cáo) đi theo tài khoản đăng nhập của Mẹ,
+  // không theo tên tự chọn.
   const SIZES = [{ label: "Vừa", pct: "112.5%" }, { label: "To", pct: "125%" }, { label: "Rất to", pct: "140%" }];
   const applySize = () => { document.documentElement.style.fontSize = SIZES[db.meta.textSize || 0].pct; };
-  let who = { known: false, id: null, artOwner: false, admin: false };
-  let users = null;
-  const ownerId = () => (settings.owner && settings.owner.id) || null;
-  function isOwner() {
-    if (!shared()) return db.meta.user === OWNER;
-    if (!who.known) return false;
-    return ownerId() ? who.id === ownerId() : who.artOwner;
+  // Có kết nối: người đang dùng là tài khoản đã đăng nhập, quyền lấy từ dòng people của họ.
+  // Không có kết nối (máy thử): vẫn chọn tên như trước, lưu trong db.meta.user.
+  let who = { known: false, uid: null, name: null, role: null };
+  const isOwner = () => (canShare ? who.known && who.role === "owner" : db.meta.user === OWNER);
+  const me = () => (canShare ? (who.known ? who.name : null) : db.meta.user === OWNER ? null : db.meta.user);
+  const people = () => PEOPLE;
+
+  // ---------- Đăng nhập ----------
+  // gate: loading (chưa biết đã đăng nhập chưa: chỉ hiện chữ chờ, để người đã đăng nhập không thấy màn đăng nhập thoáng qua)
+  //       signin (chưa đăng nhập) | denied (đăng nhập được nhưng chưa có quyền) | ok (vào sổ)
+  let gate = canShare ? "loading" : "ok";
+  const gateState = { email: "", err: "", busy: false };
+  const SIGNIN_ERR = {
+    "wrong-pin": "Sai mã PIN. Thử lại nhé.",
+    "offline": "Chưa có mạng. Cần có mạng để đăng nhập lần đầu.",
+    "too-many-tries": "Nhập sai nhiều lần. Đợi vài phút rồi thử lại.",
+    "other": "Chưa đăng nhập được. Thử lại sau một lát.",
+  };
+  function viewGate() {
+    const head = (sub) => `<header class="band"><div class="band-top"><div><h1>Sổ công dầu</h1>${sub ? `<p class="sub">${sub}</p>` : ""}</div></div></header>`;
+    if (gate === "loading") return `<p class="gate-wait" role="status">Đang mở sổ…</p>`;
+    if (gate === "denied") return head("") + `<div class="form">
+      <p class="warn" role="alert" style="margin:0">Tài khoản này chưa được cấp quyền. Báo Mẹ hoặc người quản lý.</p>
+      <button class="btn big block" data-action="sign-out">Đăng xuất</button></div>`;
+    const list = window.SO_PEOPLE || [];
+    if (!list.length) return head("") + `<p class="empty">Chưa có tài khoản nào. Báo người quản lý.</p>`;
+    return head("Chọn tên của bạn, rồi nhập mã PIN.") + `<form class="form" id="signin-form" novalidate>
+      <div class="field">
+        <span class="label" id="lbl-signin-who">Bạn là ai?</span>
+        <div class="choices two" role="group" aria-labelledby="lbl-signin-who">
+          ${list.map((p) => `<button type="button" class="choice" data-action="signin-pick" data-v="${esc(p.email)}" aria-pressed="${p.email === gateState.email}">${esc(p.name)}</button>`).join("")}
+        </div>
+      </div>
+      <div class="field">
+        <label for="pin">Mã PIN</label>
+        <input class="input pin" id="pin" type="password" inputmode="numeric" autocomplete="current-password" maxlength="6" placeholder="6 chữ số">
+      </div>
+      ${gateState.err ? `<p class="warn" id="signin-err" role="alert" style="margin:0">${esc(gateState.err)}</p>` : ""}
+      <button class="btn primary big" type="submit" id="signin-btn">Đăng nhập</button>
+    </form>`;
   }
-  const me = () => (isOwner() ? OWNER : db.meta.user === OWNER ? null : db.meta.user);
-  const people = () => (shared() ? PEOPLE.filter((p) => p !== OWNER || isOwner()) : PEOPLE);
-  // Ai đã chọn "Mẹ Liên" mà không phải tài khoản của Mẹ thì phải chọn lại
-  function fixUser() {
-    if (shared() && who.known && db.meta.user === OWNER && !isOwner()) { db.meta.user = null; save(); }
+  function renderGate() {
+    document.body.classList.add("gated");
+    document.getElementById("main").innerHTML = viewGate();
+    document.title = "Sổ công dầu";
+    const box = document.getElementById("pin");
+    if (box && gateState.email && gateState.focusPin) { gateState.focusPin = false; box.focus(); }
+  }
+  async function trySignIn(pin) {
+    if (gateState.busy) return;
+    if (!gateState.email) { gateState.err = "Chạm vào tên của bạn trước."; return render(); }
+    if (!/^\d{6}$/.test(pin)) { gateState.err = "Mã PIN gồm 6 chữ số."; gateState.focusPin = true; return render(); }
+    gateState.busy = true; gateState.err = "";
+    const btn = document.getElementById("signin-btn"); if (btn) { btn.disabled = true; btn.textContent = "Đang đăng nhập…"; }
+    try {
+      await window.soBackend.signIn(gateState.email, pin);  // đăng nhập xong thì onUser lo phần còn lại
+    } catch (e) {
+      gateState.err = SIGNIN_ERR[e && e.code] || SIGNIN_ERR.other;
+      gateState.focusPin = true;
+      render();  // vẽ lại thì ô PIN trống: PIN sai không nằm lại trên màn hình
+    }
+    gateState.busy = false;
+  }
+  // Đăng xuất: Task 7 sẽ chen vào đây lời nhắc "còn dòng chưa gửi" trước khi đăng xuất
+  async function doSignOut() {
+    try { await window.soBackend.signOut(); } catch (e) { /* vẫn tải lại để về màn đăng nhập */ }
+    location.reload();
+  }
+  async function onUser(u) {
+    if (!u) { who = { known: false, uid: null, name: null, role: null }; gate = "signin"; render(); return; }
+    if (who.known && who.uid === u.uid) return;
+    gate = "loading"; render();
+    const prof = await window.soBackend.profile(u.uid);
+    if (!prof) { gate = "denied"; render(); return; }  // chưa có dòng people: không mở sổ
+    who = { known: true, uid: u.uid, name: prof.name, role: prof.role };
+    gate = "ok";
+    startShared(window.soBackend.store);  // chỉ nối sổ sau khi đã đăng nhập, để không bị từ chối
+    render();
   }
 
   // ---------- Thông báo + hoàn tác ----------
@@ -535,7 +589,7 @@
       ${back ? `<a class="back" href="${back}">${ICON.back}Quay lại</a>` : ""}
       <div class="band-top">
         <div><h1>${title}</h1>${sub ? `<p class="sub">${sub}</p>` : ""}${syncNote()}</div>
-        ${back ? "" : `<button class="who" data-action="who" aria-label="Người đang dùng: ${esc(me() || "chưa chọn")}. Bấm để đổi">${ICON.user}${esc(me() || "Chọn người")}</button>`}
+        ${back ? "" : `<button class="who" data-action="who" aria-label="Người đang dùng: ${esc(me() || "chưa chọn")}. Bấm để ${canShare ? "mở bảng chọn" : "đổi"}">${ICON.user}${esc(me() || "Chọn người")}</button>`}
       </div>
       ${totals ? `<div class="totals${exact ? " exact" : ""}">${totals}</div>` : ""}
     </header>`;
@@ -1451,23 +1505,21 @@
     box.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); bg.querySelector('[data-k]').click(); } });
   }
   function whoSheet() {
-    const mine = shared() && isOwner();
-    const bg = sheet(`<h2 id="sheet-title">${mine ? "Máy của Mẹ" : "Ai đang dùng máy này?"}</h2>
-      ${mine ? `<p>Máy này đang dùng tài khoản của Mẹ, nên có đủ quyền của Mẹ.</p>` : `<p>App sẽ nhớ ai đã ghi từng dòng.</p>
-      ${people().map((p) => `<button class="btn big block ${p === me() ? "primary" : ""}" data-action="set-user" data-v="${esc(p)}" aria-pressed="${p === me()}">${esc(p)}</button>`).join("")}`}
-      <h2 id="size-title" style="margin-top:12px">Cỡ chữ</h2>
+    const sizes = `<h2 id="size-title" style="margin-top:12px">Cỡ chữ</h2>
       <div class="size-pick" role="group" aria-labelledby="size-title">
         ${SIZES.map((s, i) => `<button type="button" class="choice" data-action="set-size" data-v="${i}" aria-pressed="${(db.meta.textSize || 0) === i}">${s.label}</button>`).join("")}
-      </div>
-      ${shared() && who.admin ? `<h2 id="owner-title" style="margin-top:12px">Tài khoản của Mẹ</h2>
-      <p id="owner-now">${ownerId() ? "…" : "Chưa chọn. Người tạo trang đang giữ quyền của Mẹ."}</p>
-      <label class="sr-only" for="owner-q">Tìm tài khoản của Mẹ</label>
-      <input class="input" id="owner-q" autocomplete="off" placeholder="Gõ tên để tìm tài khoản của Mẹ">
-      <div id="owner-hits" class="hits"></div>
-      ${who.id && who.id !== ownerId() ? `<button class="btn block" data-action="set-owner" data-v="${esc(who.id)}">Tài khoản đang mở là của Mẹ</button>` : ""}` : ""}`);
-    if (shared() && who.admin && ownerId() && users) {
-      users.profiles([ownerId()]).then((ps) => { const el = bg.querySelector("#owner-now"); if (el) el.textContent = `Đang là: ${ps[ownerId()].name || "một tài khoản đã chọn"}.`; });
+      </div>`;
+    if (canShare) {
+      sheet(`<h2 id="sheet-title">${esc(who.name)}</h2>
+        <p>${isOwner() ? "Máy này đang dùng tài khoản của Mẹ, nên có đủ quyền của Mẹ." : "App sẽ nhớ ai đã ghi từng dòng."}</p>
+        ${sizes}
+        <button class="btn big block" data-action="sign-out" style="margin-top:12px">Đăng xuất</button>
+        <div class="sheet-links"><span></span><button class="link soft" data-action="sheet-no">Đóng</button></div>`);
+      return;
     }
+    sheet(`<h2 id="sheet-title">Ai đang dùng máy này?</h2><p>App sẽ nhớ ai đã ghi từng dòng.</p>
+      ${people().map((p) => `<button class="btn big block ${p === me() ? "primary" : ""}" data-action="set-user" data-v="${esc(p)}" aria-pressed="${p === me()}">${esc(p)}</button>`).join("")}
+      ${sizes}`);
   }
   function confirmSheet(title, text, yesLabel, onYes, danger, noLabel = "Thôi, không làm") {
     sheet(`<h2 id="sheet-title">${title}</h2><p>${text}</p>
@@ -1476,9 +1528,9 @@
     pendingYes = onYes;
   }
   let pendingYes = null;
-  // Chỉ hỏi tên khi đã biết tài khoản đang mở và ai là Mẹ, để máy của Mẹ không bị hỏi
+  // Máy thử (không có kết nối) mới hỏi tên; có kết nối thì tên lấy từ tài khoản đăng nhập
   const maybeAsk = () => {
-    if (shared() && (!who.known || !settingsReady)) return;
+    if (canShare) return;
     if (!me() && !document.getElementById("sheet")) whoSheet();
   };
 
@@ -1491,6 +1543,8 @@
   }
 
   function render() {
+    if (gate !== "ok") { renderGate(); return; }
+    document.body.classList.remove("gated");
     const { parts, anchor } = route();
     const [a0, b, c] = parts;
     const [a, query] = a0.split("?");
@@ -1542,8 +1596,8 @@
     fitFigures();
   }
   window.addEventListener("resize", fit);
-  // Bản cài lên máy mở được cả khi mất mạng; trên máy thử và trong claude.ai thì không cần
-  if ("serviceWorker" in navigator && location.protocol === "https:" && window.top === window && !/claude/.test(location.hostname))
+  // Bản cài lên máy mở được cả khi mất mạng; trên máy thử (không có https) thì không cần
+  if ("serviceWorker" in navigator && location.protocol === "https:" && window.top === window)
     navigator.serviceWorker.register("sw.js").catch(() => {});
   if (document.fonts) document.fonts.ready.then(fit);
 
@@ -1601,19 +1655,6 @@
     }
     // Tìm đơn theo tên khách: chỉ vẽ lại danh sách, ô tìm giữ nguyên
     if (t.id === "don-q") { donQ = t.value; const l = document.getElementById("don-list"); if (l) l.innerHTML = donList(); }
-    // Tìm tài khoản của Mẹ
-    if (t.id === "owner-q" && users) {
-      users.search(t.value.trim()).then((hits) => {
-        const box = document.getElementById("owner-hits"); if (!box) return;
-        box.textContent = "";
-        hits.forEach((h) => {
-          const b = document.createElement("button");
-          b.className = "btn block"; b.dataset.action = "set-owner"; b.dataset.v = h.id;
-          b.textContent = h.name + (h.isMe ? " (tài khoản đang mở)" : "");
-          box.appendChild(b);
-        });
-      });
-    }
   });
   document.addEventListener("change", (e) => {
     const t = e.target;
@@ -1624,6 +1665,7 @@
   });
 
   document.addEventListener("submit", (e) => {
+    if (e.target.id === "signin-form") { e.preventDefault(); trySignIn(document.getElementById("pin").value.trim()); return; }
     const f = e.target.closest("form[data-form]");
     if (!f) return;
     e.preventDefault();
@@ -1747,14 +1789,6 @@
     toast(`Đã ghi hao hụt ${num(qty)} ${it.unit} ${it.name}.`, () => { db.losses = db.losses.filter((y) => y.id !== l.id); });
   }
 
-  // Lưu tài khoản của Mẹ vào sổ chung (chỉ người sửa trang làm được)
-  function setOwner(id) {
-    if (!remote) return toast("Chưa kết nối sổ chung.");
-    remote.collection("settings").doc("owner").set({ id, setAt: new Date().toISOString() })
-      .then(() => { closeSheet(); toast("Đã lưu tài khoản của Mẹ."); })
-      .catch(() => toast("Chưa lưu được. Chỉ người sửa trang mới đổi được tài khoản của Mẹ."));
-  }
-
   function copyText(text) {
     const ok = () => toast("Đã chép hoá đơn. Mở Zalo rồi dán vào tin nhắn.");
     const show = () => {
@@ -1766,7 +1800,7 @@
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(ok, show); else show();
   }
 
-  const EDITS = ["handover", "recv", "recv-yes", "recv-holder", "claim", "claim-yes", "ask-next", "walk-undo", "recv-other", "recv-other-save", "pay-void", "chia-save", "pay-menu", "sx-menu", "cancel-bill", "void-menu", "import", "reset", "set-owner"];
+  const EDITS = ["handover", "recv", "recv-yes", "recv-holder", "claim", "claim-yes", "ask-next", "walk-undo", "recv-other", "recv-other-save", "pay-void", "chia-save", "pay-menu", "sx-menu", "cancel-bill", "void-menu", "import", "reset"];
   document.addEventListener("click", (e) => {
     const go = e.target.closest("[data-go]");
     if (go) { location.hash = go.dataset.go; return; }
@@ -1779,7 +1813,12 @@
       case "who": whoSheet(); break;
       case "set-user": db.meta.user = v; save(); closeSheet(); render(); toast(`Xin chào ${v}.`); break;
       case "set-size": db.meta.textSize = Number(v); save(); applySize(); whoSheet(); render(); break;
-      case "set-owner": setOwner(v); break;
+      case "sign-out": doSignOut(); break;
+      case "signin-pick":
+        gateState.email = v; gateState.err = "";
+        document.querySelectorAll('[data-action="signin-pick"]').forEach((b) => b.setAttribute("aria-pressed", String(b === el)));
+        { const w = document.getElementById("signin-err"); if (w) w.remove(); const b = document.getElementById("pin"); if (b) b.focus(); }
+        break;
       case "sheet-yes": { const f = pendingYes; pendingYes = null; closeSheet(); if (f) { f(); save(); render(); } break; }
       case "sheet-no": pendingYes = null; closeSheet(); break;
       case "go-close": closeSheet(true); location.hash = v; break;
@@ -1963,16 +2002,6 @@
 
       case "export": {
         const filename = `so-cong-dau-${today()}.json`, text = JSON.stringify(db, null, 1);
-        // Trên trang claude.ai: nhờ trang hỏi người dùng lưu file
-        if (window.claude && window.claude.use) {
-          window.claude.use("downloads").then((dl) => {
-            if (!dl) { toast("Máy này không lưu file được. Mở app trên máy tính để lưu dự phòng."); return; }
-            dl.save({ filename, data: text })
-              .then(() => toast("Đã lưu file dự phòng."))
-              .catch((err) => { if (err && err.code !== "declined") toast("Chưa lưu được file. Thử lại sau một lát."); });
-          });
-          break;
-        }
         const blob = new Blob([text], { type: "application/json" });
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob); a.download = filename; a.click();
@@ -2016,18 +2045,6 @@
   lastPath = route().parts.join("/");
   applySize();
   render();
-  if (canShare) {
-    window.claude.use("db").then((store) => {
-      if (store) { startShared(store); return; }
-      // Không mở được sổ chung: dùng bản trên điện thoại như trước
-      sync = "local"; db = load(); render(); maybeAsk();
-    });
-    // Biết ai đang mở trang để trao quyền của Mẹ đúng người; chưa biết thì chưa hỏi tên
-    window.claude.use("user").then(async (u) => {
-      users = u;
-      const m = u ? await u.me() : null;
-      who = { known: true, id: m ? m.id : null, artOwner: m ? m.isOwner : false, admin: m ? m.canEdit : false };
-      fixUser(); render(); maybeAsk();
-    });
-  } else maybeAsk();
+  if (canShare) window.soBackend.onUser((u) => { onUser(u); });
+  else maybeAsk();
 })();

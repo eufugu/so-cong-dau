@@ -6,7 +6,15 @@
     window.SO_EMULATOR = true;
     window.SO_FIREBASE_CONFIG = { apiKey: "fake-api-key", authDomain: "demo-so-cong-dau.firebaseapp.com", projectId: "demo-so-cong-dau" };
   } else {
-    // TODO (Task 6): điền giá trị thật của dự án Firebase vào đây
-    window.SO_FIREBASE_CONFIG = { apiKey: "TODO-TASK-6", authDomain: "TODO-TASK-6", projectId: "TODO-TASK-6" };
+    // To deploy your own copy, paste your Firebase web app config here (see docs/firebase-setup.md).
+    // These values are public by design; the Firestore security rules are what protect the data.
+    window.SO_FIREBASE_CONFIG = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_PROJECT_ID.firebasestorage.app",
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId: "YOUR_APP_ID",
+    };
   }
 })();

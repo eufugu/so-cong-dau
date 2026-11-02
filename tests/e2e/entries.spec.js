@@ -60,13 +60,12 @@ async function openAs(page, person) {
   await signInAs(page, person);
   await ready(page);
 }
-async function recordCash(page, { amount = '500000', method = 'TM', holder = null } = {}) {
+async function recordCash(page, { amount = '500000', method = 'TM' } = {}) {
   await page.goto(`/#/tien/ghi/${CUST.id}`);
   await page.locator('#pay-amount').fill(amount);
   await page.getByRole('button', { name: method === 'CK' ? 'Chuyển khoản' : 'Tiền mặt', exact: true }).click();
-  if (holder) await page.getByRole('button', { name: holder, exact: true }).click();
 }
-const save = (page) => page.getByRole('button', { name: 'Lưu tiền đã nhận' }).click();
+const save = (page) => page.getByRole('button', { name: 'Lưu', exact: true }).click();
 const payments = async (n) => {
   await expect.poll(async () => (await getDocs('payments')).length, { timeout: 15000 }).toBe(n);
   return getDocs('payments');
@@ -75,24 +74,22 @@ const stored = (page, key) => page.evaluate((k) => localStorage.getItem(k), key)
 const unsentTotal = (page) => page.evaluate((k) => Object.values(JSON.parse(localStorage.getItem(k) || '{}')).reduce((n, l) => n + l.length, 0), UNSENT_KEY);
 async function openMenu(page) { await page.goto('/#/'); await page.locator('button.who').click(); }
 
-test('worker records cash held by Mẹ: not yet received, and the hint says Mẹ must confirm', async ({ page, browser, baseURL }) => {
+test('worker records cash: he holds it, not yet received, until Mẹ confirms', async ({ page, browser, baseURL }) => {
   await openAs(page, WORKER);
-  await recordCash(page, { holder: 'Mẹ Liên' });
-  await expect(page.getByText('Mẹ sẽ bấm đã nhận khi nhận đủ tiền.')).toBeVisible();
-  await expect(page.getByText('Tiền đã ở chỗ Mẹ.')).toHaveCount(0);
+  await recordCash(page);
   await save(page);
   const [p] = await payments(1);
   expect(p.handed).toBe(false);
-  expect(p.holder).toBe('Mẹ Liên');
+  expect(p.holder).toBe('Bác Khang');
   expect(p.by).toBe('Bác Khang');
   await page.goto('/#/tien/thu');
-  await expect(page.getByText('Mẹ Liên đang cầm')).toBeVisible();
+  await expect(page.getByText('Bác Khang đang cầm')).toBeVisible();
   await expect(page.locator('.total', { hasText: 'Chưa về tay Mẹ' })).toContainText('500');
 
-  // Mẹ thấy khoản này và bấm "Mẹ đã nhận"
+  // Mẹ thấy khoản này và bấm đã nhận
   const mom = await otherPhone(browser, baseURL, OWNER);
   await mom.page.goto('/#/tien/thu');
-  await expect(mom.page.getByText('Mẹ Liên đang cầm')).toBeVisible();
+  await expect(mom.page.getByText('Bác Khang đang cầm')).toBeVisible();
   await mom.page.getByRole('button', { name: /Khách Thử/ }).click();
   await mom.page.getByRole('button', { name: 'Mẹ đã nhận khoản này', exact: true }).click();
   await expect.poll(async () => (await getDocs('payments'))[0].handed).toBe(true);
@@ -102,8 +99,7 @@ test('worker records cash held by Mẹ: not yet received, and the hint says Mẹ
 
 test('owner records cash held by Mẹ: received at once', async ({ page }) => {
   await openAs(page, OWNER);
-  await recordCash(page, { holder: 'Mẹ Liên' });
-  await expect(page.getByText('Tiền đã ở chỗ Mẹ.')).toBeVisible();
+  await recordCash(page);
   await save(page);
   const [p] = await payments(1);
   expect(p.handed).toBe(true);
@@ -183,7 +179,7 @@ test("entries from a second worker appear on the first worker's screen", async (
   await openAs(page, WORKER);
   await page.goto('/#/tien/thu');
   const other = await otherPhone(browser, baseURL, WORKER2);
-  await recordCash(other.page, { holder: 'Chú Tư' });
+  await recordCash(other.page);
   await save(other.page);
   await expect(page.getByText('Chú Tư đang cầm')).toBeVisible({ timeout: 20000 });
   await other.ctx.close();
@@ -235,7 +231,7 @@ test('a different person signing in on the same phone does not inherit the last 
   expect(await unsentTotal(page)).toBe(0);
 });
 
-test('worker holder list shows real names; Người khác is only a typed holder, never an identity', async ({ page }) => {
+test('Người khác is never an identity, and the form never asks who holds the money', async ({ page }) => {
   await openAs(page, WORKER);
   await page.goto('/#/');
   await expect(page.locator('button.who')).toContainText('Bác Khang');
@@ -244,15 +240,29 @@ test('worker holder list shows real names; Người khác is only a typed holder
   await page.getByRole('button', { name: 'Đóng' }).click();
 
   await recordCash(page);
-  const group = page.getByRole('group', { name: 'Ai đang cầm tiền này?' });
-  for (const n of ['Mẹ Liên', 'Bác Khang', 'Chú Tư']) await expect(group.getByRole('button', { name: n, exact: true })).toBeVisible();
-  // Tiền đang ở chỗ người không có tài khoản: gõ tên
-  await group.getByRole('button', { name: 'Người khác', exact: true }).click();
-  await page.locator('#pay-other').fill('Cô Lan');
+  await expect(page.getByRole('group', { name: 'Ai đang cầm tiền này?' })).toHaveCount(0);
   await save(page);
   const [p] = await payments(1);
-  expect(p.holder).toBe('Cô Lan');
-  expect(p.handed).toBe(false);
+  expect(p.holder).toBe('Bác Khang');
+});
+
+test('Ghi tiền: search without diacritics, debt once with Trả hết, date behind Đổi ngày', async ({ page }) => {
+  await putDoc('customers', 'k-m', { id: 'k-m', name: 'Cậu Minh', phone: '', address: '', by: 'Excel', void: false });
+  await putDoc('orders', 'o-m', { id: 'o-m', date: '2026-10-01', deliver: '2026-10-01', customerId: 'k-m', customer: 'Cậu Minh', product: 'DAU-0.5', color: 'Đỏ', cartons: 2, price: 360000, status: 'Đã giao', by: 'Excel', void: false });
+  await openAs(page, WORKER);
+  await page.goto('/#/tien/ghi');
+  await page.locator('#pay-q').fill('cau minh');
+  await expect(page.getByRole('button', { name: 'Khách Thử' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Cậu Minh', exact: true }).click();
+  await expect(page.locator('#pay-amount')).toBeFocused();
+  await expect(page.locator('.pay-debt')).toContainText('Còn nợ 720.000');
+  await expect(page.locator('form')).not.toContainText('Chuyến');
+  await page.getByRole('button', { name: 'Trả hết' }).click();
+  await expect(page.locator('#pay-amount')).toHaveValue('720.000');
+  await expect(page.locator('#pay-date')).toHaveCount(0);
+  await expect(page.locator('.pay-day')).toContainText('Hôm nay');
+  await page.getByRole('button', { name: 'Đổi ngày' }).click();
+  await expect(page.locator('#pay-date')).toBeVisible();
 });
 
 test('a login whose name is written in NFD still gets rows the server accepts, with by in NFC', async ({ page }) => {
@@ -275,7 +285,7 @@ test('a login whose name is written in NFD still gets rows the server accepts, w
   expect(p.by).not.toBe('Bác Khang'.normalize('NFD'));
 });
 
-test('a worker never sees "Tự chọn chuyến"; Mẹ does', async ({ page, browser, baseURL }) => {
+test('nobody chooses trips on Ghi tiền; payments stay automatic', async ({ page, browser, baseURL }) => {
   for (const [i, d] of ['2026-10-01', '2026-10-05'].entries()) {
     await putDoc('orders', `o-${i}`, { id: `o-${i}`, date: d, deliver: d, customerId: CUST.id, customer: CUST.name, product: 'DAU-0.5', color: 'Đỏ', cartons: 2, price: 360000, status: 'Đã giao', by: 'Excel', void: false });
   }
@@ -289,7 +299,7 @@ test('a worker never sees "Tự chọn chuyến"; Mẹ does', async ({ page, bro
 
   const mom = await otherPhone(browser, baseURL, OWNER);
   await recordCash(mom.page);
-  await expect(mom.page.getByRole('button', { name: 'Tự chọn chuyến' })).toBeVisible();
+  await expect(mom.page.getByRole('button', { name: 'Tự chọn chuyến' })).toHaveCount(0);
   await mom.ctx.close();
 });
 

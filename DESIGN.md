@@ -6,6 +6,7 @@ colors:
   band: "#eef0fb"
   grid: "#c9cdf0"
   grid-soft: "#dfe2f6"
+  grid-faint: "#e7e9f8"
   line: "#d7daee"
   edge: "#7f86bd"
   ink: "#1f1f24"
@@ -246,7 +247,8 @@ A paper-and-ink palette: white page, lilac-blue printed grid, ballpoint blue for
 - **Paper** (paper): the page, cards, inputs and buttons at rest.
 - **Ô Ly Tint** (band): the header band's base colour, empty states, read-only inputs, table header row and total column, and the person chips on the production log.
 - **Grid Line** (grid): the band's bottom border, the tab bar's top border, the dashed outline of empty states and total-card borders.
-- **Faint Grid** (grid-soft): the 22px grid lines inside the band, the progress-step track, and the stock table's last header cell.
+- **Faintest Grid** (grid-faint): the 22px grid lines inside the band.
+- **Faint Grid** (grid-soft): the progress-step track and the stock table's last header cell.
 - **Ruled Line** (line): the 1px row dividers in ledgers and the stock table.
 - **Control Edge** (edge): 2px borders on inputs, choices, chips and the person button (3.5:1 on white). Also the idle sync dot.
 - **Ink** (ink): labels, body text, toast background.
@@ -258,6 +260,8 @@ Product swatches (#c8102e Đỏ, #f2c230 Vàng, #fff Trắng) are content colour
 **The Blue Means Number Rule.** Ballpoint blue is for figures and the controls that produce them. It is never decoration.
 
 **The Red Pen Rule.** Red appears only as the margin rule, the active tab, or an alarm (debt, low or zero stock, a danger action, a lost connection).
+
+**The Calm Home Rule.** Hôm nay is the screen Mẹ opens every day, so it is quieter than the ledger pages. Red on a figure means something needs action today: materials to order, few tanks left, a production log not yet written. Debt, money not yet with Mẹ and profit (even negative) are ballpoint blue there. Overdue debt would be red too, but the app has no overdue rule yet. The margin rule drops to 35% opacity, and figures to weight 600.
 
 **The Printed Grid Rule.** The 22px ô ly grid pattern appears only in the header band. Empty states and table headers get the flat tint. Data never sits on the grid pattern.
 
@@ -325,9 +329,9 @@ Firm and plain: outlined pen-blue on paper, filled only for the main action.
 - **Danger:** paper fill, red border and text (Hủy đơn, destructive confirms).
 - **Big:** 64px tall, 1.15rem text. Used for the full-width "Ghi sản xuất hôm nay" and "Lên đơn mới" and for sheet actions. `.block` makes a button full width.
 - **Disabled:** solid grid-soft fill, control-edge border, pencil text, not-allowed cursor (no fading, so the label stays readable).
-- **Stacked (money confirm):** a Big primary with two lines: the action with its check icon, then the amount at min(1.6rem, 7vw) / 700. Min 84px tall. Used for "Mẹ đã nhận…" and Mẹ's "Xác nhận tiền chưa về tay Mẹ" on Hôm nay; it is always the strongest button on its screen.
-- **Money format rule.** Short form (57tr, 24,2tr) only in the two band total cards. Every list row, sheet and button shows the exact amount (28.200.000), rounded to the thousand only for profit. Ledger and card figures carry no ₫; buttons, sheets and toasts add " ₫". Never show the same amount twice on one screen: when Mẹ's confirm button carries "Chưa về tay Mẹ", her second card shows "Đã về tay Mẹ tháng N" instead.
-- **One main button per screen.** Hôm nay gives Mẹ the money confirm and everyone else "Ghi sản xuất hôm nay"; the other person's action becomes an outline button or a link row.
+- **Stacked (money confirm):** a Big primary with two lines: the action with its check icon, then the amount at min(1.6rem, 7vw) / 700. Min 84px tall. Used for "Mẹ đã nhận…"; it is always the strongest button on its screen. Never on Hôm nay, where money is a plain row.
+- **Money format rule.** Short form (57tr, 24,2tr) only in the two band total cards. Every list row, sheet and button shows the exact amount (28.200.000), rounded to the thousand only for profit. Ledger and card figures carry no ₫; buttons, sheets and toasts add " ₫". Never show the same amount twice on one screen: when Mẹ's money row carries "Chưa về tay Mẹ", her second card shows "Đã về tay Mẹ tháng N" instead.
+- **One main button per screen.** On Hôm nay it is "Ghi sản xuất" for everyone: under the list for Mẹ, above it ("Ghi sản xuất hôm nay") for others. Mẹ's money question or confirm is the first row of the list, at regular weight (`.row.plain`).
 - **Focus:** the global 3px pen-blue outline with a 2px offset.
 
 ### Chips
@@ -358,7 +362,7 @@ Firm and plain: outlined pen-blue on paper, filled only for the main action.
 - **Person button:** a 44px pill on the right of the band showing who is using the phone. It opens the sheet with the person picker and the text-size choice (Vừa / To / Rất to).
 
 ### Header Band (signature)
-Ô ly tint with a 22px grid of faint-grid lines and a 2px grid bottom border. It contains the headline, a pencil sub-line (the lunar date, with its key part in pen-blue 600, because a date is a number, not an alarm), the sync status line, and optionally two total cards side by side.
+Ô ly tint with a 22px grid of barely visible grid-faint lines and a 2px grid bottom border. It contains the headline, a pencil sub-line (the lunar date, with its key part in pen-blue 600, because a date is a number, not an alarm), the sync status line, and optionally two total cards side by side.
 
 ### Sync Status Line
 A 0.85rem / 600 pencil line under the band sub-line with a 9px dot in front. Live: green dot, "Sổ chung". Loading: edge-coloured dot. Stale or read-only: red text and red dot. It is announced as `role="status"`.
@@ -375,7 +379,7 @@ A 72px minus/plus button pair (pen outline) flanking a 2px edge-bordered numeric
 ### Toast and Sheet
 - **Toast:** dark ink bar fixed above the tab bar, white text, with a white-outlined "Ghi nhầm" undo button (8px radius, min 44px). It slides up 16px and fades in (.35s cubic-bezier(.16,1,.3,1), opacity .25s ease-out). It stays for 8s when undo is offered, otherwise 4s, and pauses while pointed at or focused. Swiping it sideways or down (or Esc) puts it away; a short swipe springs back.
 - **Sheet:** paper panel docked to the bottom, 16px top corners, a stack of big block buttons with 10px gaps, over a 35% black scrim. At most one primary; alternatives sit in a two-column choice grid under a bold question; the exits ("Xem sổ của khách", "Thôi") are text links on one line at the bottom, "Thôi" in pencil.
-- **Unknown-holder money:** a "Chưa rõ ai cầm" group never gets an all-at-once confirm. Each line says "ai cầm?" and its sheet asks "Ai đang cầm khoản này?" with Mẹ cầm rồi / Bác Khang / Người khác / Tài khoản Mẹ (by payment method), so money always has a holder before it counts as đã về tay Mẹ. Mẹ's home button then asks "Ai đang cầm 3 khoản tiền?" and opens the sheet itself: each answer moves straight to the next unknown payment ("Khoản 2/3", with the last answer and its "Ghi nhầm" on top, "Để sau" to stop) and ends back on the page she started from. Anyone else can tap an unknown line and choose "Tôi đang cầm khoản này" (only Mẹ marks money received), and their home card shows "Bác Khang đang cầm …" instead of a red total.
+- **Unknown-holder money:** a "Chưa rõ ai cầm" group never gets an all-at-once confirm. Each line says "ai cầm?" and its sheet asks "Ai đang cầm khoản này?" with Mẹ cầm rồi / Bác Khang / Người khác / Tài khoản Mẹ (by payment method), so money always has a holder before it counts as đã về tay Mẹ. Mẹ's home row then asks "Ai đang cầm 3 khoản tiền?" and opens the sheet itself: each answer moves straight to the next unknown payment ("Khoản 2/3", with the last answer and its "Ghi nhầm" on top, "Để sau" to stop) and ends back on the page she started from. Anyone else can tap an unknown line and choose "Tôi đang cầm khoản này" (only Mẹ marks money received), and their home card shows "Bác Khang đang cầm …" instead of a red total.
 - **Sheet focus:** a sheet opens with focus on its title, never on a money button, and closing it returns focus to the line that opened it, even after the page redraws. The faded toast is visibility-hidden so its button can't be reached.
 
 ### Order List (Đơn hàng)
@@ -383,6 +387,12 @@ The band carries two total cards (today and this month, with the number of bills
 
 ### Order Sheet (Lên đơn mới)
 Once a customer is chosen, the tiles collapse into one picked tile (name, "đổi khách") that reopens the picker. Before that, the six most recent customers are one-tap choice tiles; everyone else is in a "Khách khác…" select, with "+ Khách mới" beside the label. Below is a fill-in grid like a hand-written order: one row per kind (workshop names: 1L, 9 can, 2L…), one column per colour headed by a 28px swatch with its name written under it, each cell a 56px numeric input; a filled cell turns blotter-blue, a cell asking for more than is in stock turns red (red wins over filled). Prices sit as grey text under each name; Mẹ gets a "Sửa giá" link that turns them into inputs. Rare kinds sit under "Loại khác". "Đơn này" appears only once something is typed, as the bill preview. A sticky bar sitting on the measured top of the tab bar always shows the running total and cartons beside "Lưu đơn", so nobody scrolls to find the save button; when a cell asks for more than is in stock, the cartons line becomes a red "Kho thiếu 465 thùng 2L Vàng". Saving an order past stock first asks in a sheet ("Kho không đủ hàng", each short line with what was ordered and what is left; "Vẫn lưu đơn" or "Sửa lại số"), because the count in the app can be wrong too. Saving records every filled cell as delivered today and opens the bill.
+
+### Ghi tiền
+Only what recording a payment needs: a search field that matches names without diacritics, over up to six one-tap customer tiles with no figures on them ("Thêm khách mới" appears once something is typed, or when there are no customers); a large money input; Tiền mặt / Chuyển khoản, left unselected; "Hôm nay" with a small "Đổi ngày" link that reveals the date input; and one big "Lưu" in a sticky bar above the tab bar. Picking a customer collapses the tiles into the picked tile and moves focus to the amount, and shows "Còn nợ …" once, small, beside a "Trả hết" chip. The method decides the holder: cash is held by whoever records it, a transfer goes to Tài khoản Mẹ. Payments fall to the oldest trip automatically. Mẹ chooses a trip afterwards from the customer page (tap a payment, "Chọn chuyến cho khoản này").
+
+### Revenue chart (Doanh thu 7 ngày)
+Mẹ's Hôm nay only, under "Ghi sản xuất". One horizontal bar per day for the last seven days, oldest first, in pen blue at 70% with today at full strength, a bolder value and a darker day label. Horizontal so every value stays readable at Rất to. No grid, no axis, no legend: each value sits at the end of its bar in the short form (4,2tr / 850k), with the exact amount for screen readers. A day with no sales shows "—". Bars are 16px tall with 4px right corners. The whole chart links to Báo cáo. This is the one exception to the short-form-only-in-band-cards rule.
 
 ### Bill (Hoá đơn)
 One trip (one customer, one day) as a bill. The band shows one full-width card with the payment state ("Chưa trả · 2 ngày" in red, or "Đã trả đủ"). Lines are one per kind and price: the kind's name, then its colours as swatch + count + name ("● 6 Vàng ○ 4 Trắng"), then "14 thùng × 485.000"; the line amount sits right of the margin. A total row sits under a 2px ink rule. Under it, "Đã trả" lists each payment that paid this trip (oldest trip first), with its holder, then a red "Còn nợ" row. Then "Ghi tiền trả" as the one primary action (only when something is owed), "Gửi Zalo" (copies the bill as text and opens the customer's Zalo when a phone is known) beside "Sổ của khách", who recorded it, and for Mẹ a quiet red text action to cancel the bill.
@@ -409,11 +419,11 @@ One trip (one customer, one day) as a bill. The band shows one full-width card w
 - **Do** write kg with a decimal comma ("0,5 kg"); workshop names (1.4L, 9 can) stay as the family says them.
 - **Do** say a customer's unpaid trips one way: "Nợ chuyến 20/10" or "2 chuyến chưa trả, từ 20/10".
 - **Do** keep every colour in the `:root` tokens (pen-press, pen-ink, red-ink, red-line, dye-do, dye-vang, swatch-line, scrim, lift); no literal hex in rules.
-- **Do** name who holds the money: choosing "Người khác…" or "Tài khoản khác…" asks for a name and offers names used before; the name becomes the holder.
-- **Do** leave the payment method unselected on Ghi tiền; the holder question appears once it's chosen.
-- **Do** show "Chưa về tay Mẹ" and "… đang cầm" figures in red everywhere. CHƯA VỀ MẸ on a paid trip stays a pen stamp, because that trip is settled.
+- **Do** name who holds the money: choosing "Người khác…" or "Tài khoản khác…" on Tiền đã thu asks for a name and offers names used before; the name becomes the holder.
+- **Do** leave the payment method unselected on Ghi tiền.
+- **Do** show "Chưa về tay Mẹ" and "… đang cầm" figures in red, except on Hôm nay (see the Calm Home Rule). CHƯA VỀ MẸ on a paid trip stays a pen stamp, because that trip is settled.
 - **Do** make the red figure on a trip what's still owed, with the trip total in the small line ("còn nợ, trên 3.520.000"), so red figures add up to the debt.
-- **Do** default payments to the oldest trip, and let them be assigned: "Tự chọn chuyến" on Ghi tiền, or Mẹ taps a payment on the customer page (#/tien/chia/<id>). Money not assigned falls to the oldest trip.
+- **Do** default payments to the oldest trip. Mẹ can reassign one by tapping it on the customer page (#/tien/chia/<id>). Money not assigned falls to the oldest trip.
 - **Don't** show a big 0 in a band card or a month row. Show last month, or a small grey "Chưa có".
 - **Don't** offer a hard delete anywhere, including on lines that are already cancelled.
 - **Don't** squeeze the 5-column Kho table at the To and Rất to text sizes; switch to one ledger row per kind with each colour on its own line under the name.

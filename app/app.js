@@ -78,6 +78,7 @@
   let remote = null;          // kho chung, khi đã kết nối
   let sync = canShare ? "loading" : "local";  // local | loading | live | stale
   const mirror = {};          // bản đã có trên kho chung: col -> Map(id -> json)
+  const cachedCols = new Set();  // các mục mà lần nhận gần nhất chỉ là bản nhớ trong máy (mất mạng)
   const serverRows = {};      // bản kho chung đã xác nhận (không tính dòng đang chờ gửi): col -> Map(id -> dòng)
   const arrived = new Set();  // các mục đã nhận bản đầy đủ từ kho chung
   const shared = () => canShare && sync !== "local";
@@ -140,25 +141,49 @@
       mirror[col] = seen;
     });
   }
+  // Dòng bị kho chung từ chối: nhớ lại (qua lần đóng máy) cho tới khi người dùng bấm "Đã hiểu"
+  const REJECT_KEY = KEY + ".bi-tu-choi";
+  let rejected = [];
+  try { rejected = JSON.parse(localStorage.getItem(REJECT_KEY)) || []; } catch (e) { rejected = []; }
+  const keepRejected = () => { try { if (rejected.length) localStorage.setItem(REJECT_KEY, JSON.stringify(rejected)); else localStorage.removeItem(REJECT_KEY); } catch (e) { /* chỉ là bản tạm */ } };
+  function describeRow(col, r) {
+    try {
+      if (col === "payments") return `Tiền khách trả: ${cname(cidOf(r))}, ${money(r.amount)}`;
+      if (col === "orders") return `Đơn hàng: ${cname(cidOf(r))}, ${num(r.cartons)} thùng`;
+      if (col === "production") return `Sản xuất: ${sxLabel(product(r.product), r.color)}, ${num(r.cartons)} thùng`;
+      if (col === "customers") return `Khách mới: ${r.name}`;
+      if (col === "supplierPays") return `Tiền trả nhà cung cấp: ${r.supplier}, ${money(r.amount)}`;
+    } catch (e) { /* dùng mô tả chung */ }
+    return { purchases: "Một dòng nhập hàng", batches: "Một lần nhập dầu", losses: "Một dòng hao hụt" }[col] || "Một dòng vừa ghi";
+  }
+  function rejectedSheet() {
+    if (!rejected.length || gate !== "ok") return;
+    sheet(`<h2 id="sheet-title">Có dòng chưa được nhận</h2>
+      <p>Sổ chung không nhận dòng này: bạn chưa có quyền. Dòng đã được bỏ.</p>
+      <ul class="note">${rejected.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>
+      <button class="btn big block primary" data-action="reject-ok">Đã hiểu</button>`);
+  }
   function writeFailed(e, col, id) {
     if (mirror[col]) mirror[col].delete(id);  // lần lưu sau sẽ gửi lại
     const kind = window.soBackend.errorKind(e);
     if (kind === "refused") {
       // Kho chung từ chối dòng này (không đủ quyền): bỏ dòng, không gửi lại. Dòng đã có sẵn trên kho thì trả về bản của kho.
+      const row = db[col].find((r) => r.id === id);
+      const had = serverRows[col] && serverRows[col].get(id);
+      if (!had && row) { rejected.push(describeRow(col, row)); keepRejected(); }
       db[col] = db[col].filter((r) => r.id !== id);
       unsent[col] = (unsent[col] || []).filter((x) => x !== id); keepUnsent();
-      const had = serverRows[col] && serverRows[col].get(id);
       if (had) {
         db[col].push(JSON.parse(JSON.stringify(had)));
         (mirror[col] || (mirror[col] = new Map())).set(id, JSON.stringify(had));  // bản này đã nằm trên kho: không gửi lại
       }
       save(); render();
-      toast("Sổ chung không nhận dòng này: bạn chưa có quyền. Dòng đã được bỏ.");
+      if (had) toast("Sổ chung không nhận thay đổi này: bạn chưa có quyền. Dòng được giữ như trên sổ chung.");
+      else rejectedSheet();
       return;
     }
     if (db[col].some((r) => r.id === id)) markUnsent(col, id);
-    if (e && e.code === "resource-exhausted") toast("Sổ chung đã hết lượt ghi hôm nay. Dòng này sẽ tự gửi lại sau.");
-    else toast("Chưa gửi được lên sổ chung. Có mạng lại sẽ tự gửi.");
+    toast("Chưa gửi được lên sổ chung. Có mạng lại sẽ tự gửi.");
   }
 
   let renderLater = false;
@@ -191,16 +216,24 @@
           else if (prev.has(d.id)) confirmed.set(d.id, prev.get(d.id));  // đang sửa: vẫn nhớ bản của kho
         });
         serverRows[col] = confirmed;
+        if (snap.metadata.fromCache) cachedCols.add(col); else cachedCols.delete(col);
         if (!snap.metadata.fromCache) {
           arrived.add(col);
           if (mine.length) pushChanges();
         }
-        if (arrived.size === SHARED.length && (sync === "loading" || sync === "stale")) { sync = "live"; clearTimeout(timer); }
+        if (arrived.size === SHARED.length) {
+          // Đã vào sổ rồi mà mất mạng (hoặc chỉ còn bản trong máy) thì coi như chưa kết nối, để sửa dòng cũ phải chờ có mạng
+          const off = cachedCols.size > 0 || navigator.onLine === false;
+          if (!off && (sync === "loading" || sync === "stale")) { sync = "live"; clearTimeout(timer); }
+          else if (off && sync === "live") sync = "stale";
+        }
         try { localStorage.setItem(REMOTE_KEY, JSON.stringify(db)); } catch (e) { /* chỉ là bản tạm */ }
         later();
       }, () => { sync = "stale"; render(); });
     });
   }
+  window.addEventListener("offline", () => { if (sync === "live") { sync = "stale"; render(); } });
+  window.addEventListener("online", () => { if (sync === "stale" && arrived.size === SHARED.length && cachedCols.size === 0) { sync = "live"; render(); } });
   document.addEventListener("focusout", () => setTimeout(() => { if (renderLater && !editing()) { renderLater = false; render(); } }, 0));
   // Ghi dòng mới thì lúc nào cũng được (chưa có mạng thì để dành gửi sau).
   // Sửa hay hủy dòng cũ thì phải chờ nhận xong sổ chung, để không ghi đè lên số của người khác.
@@ -516,8 +549,13 @@
   }
   // Đăng xuất: còn dòng chưa gửi thì nhắc trước; đã đăng xuất thì xoá sạch bản sổ và dòng chờ gửi trên máy,
   // để người khác dùng máy này không thấy hay nhận lại dòng của người trước.
+  // Cỡ chữ là của chiếc máy, không phải của người dùng: giữ lại
   function forgetBook() {
-    try { localStorage.removeItem(REMOTE_KEY); localStorage.removeItem(UNSENT_KEY); } catch (e) { /* không có bộ nhớ */ }
+    try {
+      const size = db.meta && db.meta.textSize;
+      if (size) localStorage.setItem(REMOTE_KEY, JSON.stringify({ meta: { textSize: size } })); else localStorage.removeItem(REMOTE_KEY);
+      localStorage.removeItem(UNSENT_KEY);
+    } catch (e) { /* không có bộ nhớ */ }
   }
   async function doSignOut(sure) {
     const n = unsentCount();
@@ -548,19 +586,21 @@
     // Người khác với người dùng máy lần trước: bỏ bản sổ và dòng chờ gửi của người đó trước khi nối sổ
     let last = null;
     try { last = localStorage.getItem(LAST_UID_KEY); localStorage.setItem(LAST_UID_KEY, u.uid); } catch (e) { /* không có bộ nhớ */ }
-    if (last && last !== u.uid) { forgetBook(); unsent = {}; db = loadShared(); }
+    if (last && last !== u.uid) { forgetBook(); unsent = {}; rejected = []; keepRejected(); db = loadShared(); }
     who = { known: true, uid: u.uid, name: String(prof.name).normalize("NFC"), role: prof.role };
     gate = "ok";
     startShared(window.soBackend.store);  // chỉ nối sổ sau khi đã đăng nhập, để không bị từ chối
     render();
+    rejectedSheet();  // dòng bị từ chối lúc máy đang tắt: báo lại cho tới khi bấm "Đã hiểu"
   }
 
   // ---------- Thông báo + hoàn tác ----------
-  let toastTimer, undoFn = null;
+  let toastTimer, undoFn = null, undoEdit = false;
   const toastEl = document.getElementById("toast");
-  function toast(msg, undo) {
+  // edit = true: hoàn tác này sửa một dòng đã có trên sổ chung, nên cần có mạng
+  function toast(msg, undo, edit) {
     document.getElementById("toast-msg").textContent = msg;
-    undoFn = undo || null;
+    undoFn = undo || null; undoEdit = !!edit;
     document.getElementById("toast-undo").hidden = !undo;
     toastEl.style.transition = toastEl.style.transform = toastEl.style.opacity = "";
     toastEl.classList.add("show");
@@ -574,6 +614,7 @@
   ["pointerenter", "focusin"].forEach((ev) => toastEl.addEventListener(ev, () => clearTimeout(toastTimer)));
   ["pointerleave", "focusout"].forEach((ev) => toastEl.addEventListener(ev, () => armToast(undoFn ? 8000 : 4000)));
   document.getElementById("toast-undo").addEventListener("click", () => {
+    if (undoFn && undoEdit && blocked(false)) return;
     if (undoFn) { undoFn(); save(); render(); }
     undoFn = null; toastEl.classList.remove("show");
     toast("Đã bỏ, coi như chưa ghi.");
@@ -1524,7 +1565,7 @@
     closeSheet(); save(); render();
     const rest = w ? unknownPays() : [];
     if (rest.length) { walk = { done: w.done + 1, total: w.total, last: { msg, undo } }; recvSheet(rest[0]); }
-    else toast(msg, undo);
+    else toast(msg, undo, true);
   }
   function recvSheet(p) {
     const unk = p.holder === "Chưa ghi";
@@ -1883,6 +1924,7 @@
         break;
       case "sheet-yes": { const f = pendingYes; pendingYes = null; closeSheet(); if (f) { f(); save(); render(); } break; }
       case "sheet-no": pendingYes = null; closeSheet(); break;
+      case "reject-ok": rejected = []; keepRejected(); closeSheet(); break;
       case "go-close": closeSheet(true); location.hash = v; break;
 
       case "pick": setDraft(el.dataset.form, el.dataset.name, v); if (el.dataset.clear) setDraft(el.dataset.form, el.dataset.clear, ""); render(); break;
@@ -1904,7 +1946,7 @@
         confirmSheet("Mẹ đã nhận tiền?", `Xác nhận Mẹ đã nhận đủ <b>${money(amt)}</b> từ ${esc(from)}.`, "Đúng, Mẹ đã nhận đủ", () => {
           const day = today();
           items.forEach((p) => { p.handed = true; p.handedDate = day; p.handedBy = me(); fresh.add(p.id); });
-          setTimeout(() => toast(`Mẹ đã nhận ${money(amt)}.`, () => items.forEach((p) => { p.handed = false; p.handedDate = null; })), 0);
+          setTimeout(() => toast(`Mẹ đã nhận ${money(amt)}.`, () => items.forEach((p) => { p.handed = false; p.handedDate = null; }), true), 0);
         }, false, "Chưa nhận");
         break;
       }
@@ -1987,7 +2029,7 @@
         const p = db.payments.find((x) => x.id === id); if (!p) break;
         confirmSheet("Hủy khoản tiền này?", `${esc(cname(cidOf(p)))} · ${money(p.amount)} · ngày ${dm(p.date)}. Dòng này sẽ bị gạch đi chứ không mất hẳn.`, "Hủy khoản này", () => {
           p.void = true; p.voidBy = me();
-          setTimeout(() => toast("Đã hủy khoản tiền.", () => { p.void = false; }), 0);
+          setTimeout(() => toast("Đã hủy khoản tiền.", () => { p.void = false; }, true), 0);
         }, true, "Giữ lại");
         break;
       }
@@ -2007,7 +2049,7 @@
         p.alloc = allocList(chia.alloc); if (!p.alloc.length) p.alloc = null;
         chia = null; save();
         location.hash = `#/khach/${enc(cid)}`;
-        toast(p.alloc ? `Đã chia khoản ${money(p.amount)}.` : "Khoản này trừ vào chuyến cũ nhất trước.", () => { p.alloc = was; });
+        toast(p.alloc ? `Đã chia khoản ${money(p.amount)}.` : "Khoản này trừ vào chuyến cũ nhất trước.", () => { p.alloc = was; }, true);
         break;
       }
 
@@ -2017,7 +2059,7 @@
         if (!x) break;
         confirmSheet("Hủy dòng này?", "Dòng này sẽ bị gạch đi và số trong kho, số tiền tự tính lại.", "Hủy dòng này", () => {
           x.void = true; x.voidBy = me();
-          setTimeout(() => toast("Đã hủy dòng.", () => { x.void = false; }), 0);
+          setTimeout(() => toast("Đã hủy dòng.", () => { x.void = false; }, true), 0);
         }, true, "Giữ lại");
         break;
       }
@@ -2039,7 +2081,7 @@
         const x = db.production.find((y) => y.id === id);
         confirmSheet("Bỏ dòng này?", `${x.cartons} thùng ${esc(sxLabel(product(x.product), x.color))}. Dòng này sẽ bị gạch đi và kho tự tính lại.`, "Bỏ dòng này", () => {
           x.void = true; x.voidBy = me();
-          setTimeout(() => toast("Đã bỏ dòng.", () => { x.void = false; }), 0);
+          setTimeout(() => toast("Đã bỏ dòng.", () => { x.void = false; }, true), 0);
         }, true, "Giữ lại");
         break;
       }
@@ -2048,7 +2090,7 @@
         confirmSheet("Hủy hoá đơn này?", `${esc(cname(cid))} · ${dm(day)} · ${num(sum(lines, (o) => o.cartons))} thùng, ${money(sum(lines, orderValue))}. Hàng sẽ được cộng lại vào kho.`, "Hủy hoá đơn", () => {
           lines.forEach((o) => { o.status = "Hủy"; o.voidBy = me(); });
           location.hash = "#/don";
-          setTimeout(() => toast("Đã hủy hoá đơn.", () => lines.forEach((o) => { o.status = "Đã giao"; })), 0);
+          setTimeout(() => toast("Đã hủy hoá đơn.", () => lines.forEach((o) => { o.status = "Đã giao"; }), true), 0);
         }, true, "Giữ lại");
         break;
       }

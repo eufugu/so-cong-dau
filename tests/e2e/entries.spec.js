@@ -29,8 +29,8 @@ async function otherPhone(browser, baseURL, person) {
   return { ctx, page };
 }
 
-// Cho trang giả lập một lần ghi lên kho: 'hold' = treo mãi (chưa gửi được), 'exhaust' = kho báo hết lượt ghi.
-// Chỉ dùng cho hai tình huống không dựng được bằng emulator thật; từ chối vì thiếu quyền thì dùng emulator thật.
+// Cho trang giả lập một lần ghi lên kho treo mãi (window.__writes = 'hold'), để dòng nằm yên ở trạng thái chưa gửi.
+// Từ chối vì thiếu quyền thì dùng emulator thật.
 async function switchWrites(page) {
   await page.addInitScript(() => {
     let real;
@@ -44,7 +44,7 @@ async function switchWrites(page) {
           const doc = c.doc.bind(c);
           c.doc = (id) => {
             const d = doc(id), set = d.set;
-            d.set = (data) => (window.__writes === 'hold' ? new Promise(() => {}) : window.__writes === 'exhaust' ? Promise.reject({ code: 'resource-exhausted' }) : set(data));
+            d.set = (data) => (window.__writes === 'hold' ? new Promise(() => {}) : set(data));
             return d;
           };
           return c;
@@ -137,7 +137,19 @@ test('a refused new row: message, leaves the waiting list, nothing resent, other
   await putDoc('people', ids.worker, { name: WORKER.name, role: 'none' });
   await recordCash(page);
   await save(page);
-  await expect(page.getByText('Sổ chung không nhận dòng này: bạn chưa có quyền. Dòng đã được bỏ.')).toBeVisible();
+  // Bảng báo nằm lại cho tới khi bấm "Đã hiểu", nói rõ dòng nào bị bỏ
+  const note = page.locator('#sheet');
+  await expect(note.getByText('Sổ chung không nhận dòng này: bạn chưa có quyền. Dòng đã được bỏ.')).toBeVisible();
+  await expect(note).toContainText('Khách Thử');
+  await expect(note).toContainText('500.000');
+  await page.waitForTimeout(5000);
+  await expect(note).toBeVisible();
+  await page.reload();
+  await expect(page.locator('#sheet')).toContainText('Khách Thử');
+  expect(await stored(page, 'so-cong-dau.v1.bi-tu-choi')).not.toBeNull();
+  await page.getByRole('button', { name: 'Đã hiểu' }).click();
+  await expect(page.locator('#sheet')).toHaveCount(0);
+  expect(await stored(page, 'so-cong-dau.v1.bi-tu-choi')).toBeNull();
   await expect.poll(() => unsentTotal(page)).toBe(0);
   await expect(page.locator('.sync')).toHaveText('Sổ chung');
   await page.waitForTimeout(1500);
@@ -158,23 +170,13 @@ test('a refused change to a row already on the server puts the server copy back'
   await page.goto('/#/tien/thu');
   await page.getByRole('button', { name: /Khách Thử/ }).click();
   await page.getByRole('button', { name: 'Tôi đang cầm khoản này' }).click();
-  await expect(page.getByText('Sổ chung không nhận dòng này: bạn chưa có quyền. Dòng đã được bỏ.')).toBeVisible();
+  await expect(page.getByText('Sổ chung không nhận thay đổi này: bạn chưa có quyền. Dòng được giữ như trên sổ chung.')).toBeVisible();
+  await expect(page.locator('#sheet')).toHaveCount(0);
   await expect(page.getByText('Chưa rõ ai cầm')).toBeVisible();
   await expect(page.locator('.sync')).toHaveText('Sổ chung');
   await page.waitForTimeout(1500);
   expect((await getDocs('payments'))[0].holder).toBe('Chưa ghi');
   await expect(page.getByText('Chưa rõ ai cầm')).toBeVisible();
-});
-
-test('a full or rate-limited server keeps the row waiting and says it will resend', async ({ page }) => {
-  await switchWrites(page);
-  await openAs(page, WORKER);
-  await page.evaluate(() => { window.__writes = 'exhaust'; });
-  await recordCash(page);
-  await save(page);
-  await expect(page.getByText('Sổ chung đã hết lượt ghi hôm nay. Dòng này sẽ tự gửi lại sau.')).toBeVisible();
-  expect(await unsentTotal(page)).toBe(1);
-  await expect(page.getByText('Sổ chung không nhận dòng này')).toHaveCount(0);
 });
 
 test("entries from a second worker appear on the first worker's screen", async ({ page, browser, baseURL }) => {
@@ -206,7 +208,7 @@ test('sign out with a waiting entry warns, staying keeps it, leaving clears the 
   await page.getByRole('button', { name: 'Đăng xuất' }).click();
   await page.getByRole('button', { name: 'Vẫn đăng xuất' }).click();
   await expect(page.getByLabel('Mã PIN')).toBeVisible();
-  expect(await stored(page, REMOTE_KEY)).toBeNull();
+  expect(JSON.parse((await stored(page, REMOTE_KEY)) || '{}').payments ?? []).toHaveLength(0);
   expect(await stored(page, UNSENT_KEY)).toBeNull();
   // Người khác đăng nhập trên máy này: không thấy dòng của người trước
   await page.getByRole('button', { name: 'Mẹ Liên' }).click();
@@ -297,4 +299,30 @@ test('local mode keeps the old picker with Người khác', async ({ page }) => 
   await expect(page.getByText('Ai đang dùng máy này?')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Người khác' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Bác Khang' })).toBeVisible();
+});
+
+test('editing an old row offline is blocked with a message; online it works', async ({ page, context }) => {
+  await putDoc('payments', 'p-chua', { id: 'p-chua', date: '2026-10-30', customerId: CUST.id, customer: CUST.name, amount: 700000, method: 'TM', holder: 'Chưa ghi', handed: false, handedDate: null, by: 'Excel', void: false });
+  await openAs(page, WORKER);
+  await page.goto('/#/tien/thu');
+  await expect(page.getByText('Chưa rõ ai cầm')).toBeVisible();
+  await context.setOffline(true);
+  await expect(page.locator('.sync.stale')).toBeVisible({ timeout: 20000 });
+  await page.getByRole('button', { name: /Khách Thử/ }).click();
+  await expect(page.getByText('Sửa hay hủy dòng cũ cần có mạng.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Tôi đang cầm khoản này' })).toHaveCount(0);
+  await context.setOffline(false);
+  await expect(page.locator('.sync.live')).toBeVisible({ timeout: 40000 });
+  await page.getByRole('button', { name: /Khách Thử/ }).click();
+  await page.getByRole('button', { name: 'Tôi đang cầm khoản này' }).click();
+  await expect.poll(async () => (await getDocs('payments'))[0].holder).toBe('Bác Khang');
+});
+
+test('text size survives sign-out', async ({ page }) => {
+  await openAs(page, WORKER);
+  await page.locator('button.who').click();
+  await page.getByRole('button', { name: 'To', exact: true }).click();
+  await page.getByRole('button', { name: 'Đăng xuất' }).click();
+  await expect(page.getByLabel('Mã PIN')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.style.fontSize)).toBe('125%');
 });

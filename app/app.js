@@ -1537,19 +1537,21 @@
   // ---------- Trang: Báo cáo (chỉ Mẹ) ----------
   const monthOf = (s) => s.slice(0, 7);
   const costOf = (o) => o.cartons * unitCost(product(o.product) || {}).total;
-  // Màu đi theo loại hàng, không theo thứ hạng. Mỗi loại: [ô màu, chữ số trên miếng màu sẫm]; miếng xếp theo thứ tự loại hàng quen thuộc.
-  const PIE = { "DAU-0.5": [1, 0], "DAU-0.6": [2, 1], "DAU-0.8": [3, 1], "DAU-1": [4, 1], "DAU-1.3": [5, 0], "DAU-1.5": [6, 0], "DAU-HS": [7, 1],
-    "DAU-1.1": [8, 1], "DAU-1.2": [9, 1], "DAU-1.4": [10, 0], "NEN-TL": [11, 0], "NEN-SH": [12, 1] };
-  let bc = { month: null, slice: null }, pieNow = [];
+  // Màu đi theo loại hàng, không theo thứ hạng, nên lọc tháng nào một loại vẫn một màu. Mỗi loại: [ô màu, chữ tối trên miếng sáng].
+  const PIE = { "DAU-0.5": [1, 1], "DAU-0.6": [2, 1], "DAU-0.8": [3, 1], "DAU-1": [4, 0], "DAU-1.3": [5, 1], "DAU-1.5": [6, 0], "DAU-HS": [7, 0],
+    "DAU-1.1": [8, 1], "DAU-1.2": [9, 1], "DAU-1.4": [10, 0], "NEN-TL": [11, 0], "NEN-SH": [12, 0] };
+  // slice: chưa chọn gì thì nhấc sẵn miếng lớn nhất; null là người dùng đã đặt xuống
+  let bc = { month: null, slice: undefined }, pieNow = [];
   const bcMonth = () => bc.month || today().slice(0, 7);
   const monthText = (m) => `${Number(m.slice(5))}/${m.slice(0, 4)}`;
   // Các tháng có bán, mới nhất trước; tháng này luôn có để quay về
   const bcMonths = () => [...new Set([today().slice(0, 7), ...soldOrders().map((o) => monthOf(soldDay(o)))])].sort().reverse();
+  // Doanh thu cao nhất trước, cả trên bánh lẫn trong chú giải
   function pieSlices(orders) {
     const rows = db.products.map((p) => {
       const os = orders.filter((o) => o.product === p.code);
       return { code: p.code, name: sxName(p), rev: sum(os, orderValue), cartons: sum(os, (o) => o.cartons), tone: PIE[p.code] || [8, 1] };
-    }).filter((x) => x.rev > 0);
+    }).filter((x) => x.rev > 0).sort((a, b) => b.rev - a.rev);
     const all = sum(rows, (x) => x.rev);
     let a = -Math.PI / 2;
     return rows.map((x) => {
@@ -1558,29 +1560,38 @@
       return { ...x, share, from, to, pct: share < 0.005 ? "<1" : String(Math.round(share * 100)) };
     });
   }
-  // Bánh nghiêng: mặt trên là hình elip, thành bánh chỉ thấy ở nửa phía trước, lõi xám lộ ra khi nhấc một miếng lên
-  const PIE_BOX = { w: 343, h: 236, cx: 171.5, cy: 106, rx: 150, ry: 84, depth: 28 };
+  // Bánh vòng nổi: mặt trên là vành elip; thành ngoài thấy ở nửa trước, thành trong thấy ở nửa sau qua lỗ giữa; lõi xám lộ ra khi nhấc một miếng lên
+  const PIE_BOX = { w: 343, h: 240, cx: 171.5, cy: 102, rx: 150, ry: 84, depth: 38, hole: 0.44 };
   function pieSvg(slices, active) {
-    const { w, h, cx, cy, rx, ry, depth } = PIE_BOX;
-    const pt = (t, dz = 0) => `${(cx + rx * Math.cos(t)).toFixed(1)} ${(cy + ry * Math.sin(t) + dz).toFixed(1)}`;
-    const arcTo = (t, big, sweep, dz = 0) => `A${rx} ${ry} 0 ${big ? 1 : 0} ${sweep} ${pt(t, dz)}`;
-    const wall = (a, b) => `M${pt(a)} ${arcTo(b, b - a > Math.PI, 1)} L${pt(b, depth)} ${arcTo(a, b - a > Math.PI, 0, depth)} Z`;
-    const cut = (t) => `M${cx} ${cy} L${pt(t)} L${pt(t, depth)} L${cx} ${cy + depth} Z`;
+    const { w, h, cx, cy, rx, ry, depth, hole } = PIE_BOX, irx = rx * hole, iry = ry * hole;
+    const out = (t, dz = 0) => `${(cx + rx * Math.cos(t)).toFixed(1)} ${(cy + ry * Math.sin(t) + dz).toFixed(1)}`;
+    const inn = (t, dz = 0) => `${(cx + irx * Math.cos(t)).toFixed(1)} ${(cy + iry * Math.sin(t) + dz).toFixed(1)}`;
+    const arcOut = (t, big, sweep, dz = 0) => `A${rx} ${ry} 0 ${big ? 1 : 0} ${sweep} ${out(t, dz)}`;
+    const arcIn = (t, big, sweep, dz = 0) => `A${irx.toFixed(1)} ${iry.toFixed(1)} 0 ${big ? 1 : 0} ${sweep} ${inn(t, dz)}`;
+    const wallOut = (a, b) => `M${out(a)} ${arcOut(b, b - a > Math.PI, 1)} L${out(b, depth)} ${arcOut(a, b - a > Math.PI, 0, depth)} Z`;
+    const wallIn = (a, b) => `M${inn(a)} ${arcIn(b, b - a > Math.PI, 1)} L${inn(b, depth)} ${arcIn(a, b - a > Math.PI, 0, depth)} Z`;
+    const cut = (t) => `M${inn(t)} L${out(t)} L${out(t, depth)} L${inn(t, depth)} Z`;
+    const shaded = (cls, d, extra = "") => `<path class="${cls}" d="${d}"${extra}/><path class="${cls}-shade pie-shade" d="${d}"${extra}/>`;
+    const clip = ' clip-path="url(#pie-hole)"';
     const piece = (x) => {
-      const mid = (x.from + x.to) / 2, f0 = Math.max(x.from, 0), f1 = Math.min(x.to, Math.PI), big = x.to - x.from > Math.PI;
-      const front = f1 > f0 ? wall(f0, f1) : "";
-      const lx = cx + rx * 0.62 * Math.cos(mid), ly = cy + ry * 0.62 * Math.sin(mid) + 5;
-      return `<g class="slice${x.code === active ? " on" : ""}" data-slice="${x.code}" style="--c:var(--pie-${x.tone[0]});--dx:${(Math.cos(mid) * 14).toFixed(1)}px;--dy:${(Math.sin(mid) * 10 - 9).toFixed(1)}px">
-        <path class="pie-cut" d="${cut(x.from)}"/><path class="pie-cut-shade pie-shade" d="${cut(x.from)}"/>
-        <path class="pie-cut" d="${cut(x.to)}"/><path class="pie-cut-shade pie-shade" d="${cut(x.to)}"/>
-        ${front ? `<path class="pie-wall" d="${front}"/><path class="pie-shade" d="${front}"/>` : ""}
-        <path class="pie-top" d="M${cx} ${cy} L${pt(x.from)} ${arcTo(x.to, big, 1)} Z"/>
+      const mid = (x.from + x.to) / 2, big = x.to - x.from > Math.PI;
+      const f0 = Math.max(x.from, 0), f1 = Math.min(x.to, Math.PI);
+      // Nửa sau của lỗ: góc từ -90° tới 0° và từ 180° tới 270°
+      const back = [[Math.max(x.from, -Math.PI / 2), Math.min(x.to, 0)], [Math.max(x.from, Math.PI), Math.min(x.to, 1.5 * Math.PI)]].filter(([a, b]) => b > a);
+      const lx = cx + rx * 0.72 * Math.cos(mid), ly = cy + ry * 0.72 * Math.sin(mid) + 5;
+      return `<g class="slice${x.code === active ? " on" : ""}" data-slice="${x.code}" style="--c:var(--pie-${x.tone[0]});--dx:${(Math.cos(mid) * 14).toFixed(1)}px;--dy:${(Math.sin(mid) * 10 - 10).toFixed(1)}px">
+        ${back.map(([a, b]) => shaded("pie-in", wallIn(a, b), clip)).join("")}
+        ${shaded("pie-cut", cut(x.from))}${shaded("pie-cut", cut(x.to))}
+        ${f1 > f0 ? shaded("pie-out", wallOut(f0, f1)) : ""}
+        <path class="pie-top" d="M${out(x.from)} ${arcOut(x.to, big, 1)} L${inn(x.to)} ${arcIn(x.from, big, 0)} Z"/>
         ${x.share >= 0.06 ? `<text class="pie-pct${x.tone[1] ? " ink" : ""}" x="${lx.toFixed(1)}" y="${ly.toFixed(1)}">${x.pct}%</text>` : ""}
       </g>`;
     };
     const order = [...slices.filter((x) => x.code !== active), ...slices.filter((x) => x.code === active)];
     return `<svg viewBox="0 0 ${w} ${h}" aria-hidden="true" focusable="false">
-      <path class="pie-core-wall" d="${wall(0, Math.PI)}"/><ellipse class="pie-core" cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}"/>
+      <defs><clipPath id="pie-hole"><ellipse cx="${cx}" cy="${cy}" rx="${irx.toFixed(1)}" ry="${iry.toFixed(1)}"/></clipPath></defs>
+      <path class="pie-core-wall" d="${wallOut(0, Math.PI)}"/>
+      <path class="pie-core" fill-rule="evenodd" d="M${cx - rx} ${cy} A${rx} ${ry} 0 1 0 ${cx + rx} ${cy} A${rx} ${ry} 0 1 0 ${cx - rx} ${cy} Z M${cx - irx} ${cy} A${irx.toFixed(1)} ${iry.toFixed(1)} 0 1 0 ${cx + irx} ${cy} A${irx.toFixed(1)} ${iry.toFixed(1)} 0 1 0 ${cx - irx} ${cy} Z"/>
       <g class="pie-slices">${order.map(piece).join("")}</g>
     </svg>`;
   }
@@ -1614,7 +1625,8 @@
     const m = bcMonth(), os = soldOrders().filter((o) => monthOf(soldDay(o)) === m);
     const rev = sum(os, orderValue), profit = rev - sum(os, costOf);
     pieNow = pieSlices(os);
-    if (!pieNow.some((x) => x.code === bc.slice)) bc.slice = null;
+    if (bc.slice === undefined) bc.slice = pieNow.length ? pieNow[0].code : null;
+    else if (!pieNow.some((x) => x.code === bc.slice)) bc.slice = null;
     return band({ title: `Báo cáo tháng ${monthText(m)}`, back: "#/", exact: true,
       side: `<button class="who icon" data-action="bc-months" aria-label="Chọn tháng khác, đang xem tháng ${monthText(m)}">${ICON.cal}</button>`,
       totals: total("Doanh thu", rev ? num(rev) : NONE, "#/baocao") + total("Lợi nhuận", rev ? num(Math.round(profit / 1000) * 1000) : NONE, "#/baocao") }) + `
@@ -1622,14 +1634,7 @@
     ${pieNow.length ? `<div class="pie-detail" id="pie-detail" aria-live="polite">${pieDetail(pieNow.find((x) => x.code === bc.slice))}</div>
     <div id="pie">${pieSvg(pieNow, bc.slice)}</div>
     <ul class="pie-legend">${pieNow.map((x) => `<li><button type="button" class="pie-key" data-action="bc-slice" data-v="${x.code}" aria-pressed="${x.code === bc.slice}" style="--c:var(--pie-${x.tone[0]})"><span class="pie-swatch" aria-hidden="true"></span><span>${esc(x.name)}</span><b>${num(x.rev)}</b></button></li>`).join("")}</ul>`
-      : `<p class="empty">Tháng ${monthText(m)} chưa bán thùng nào. Chạm vào hình lịch ở góc trên để xem tháng khác.</p>`}
-    <h2 class="sec">Lãi mỗi thùng <small>giá bán trừ giá vốn</small></h2>
-    <ul class="ledger">${db.products.filter((p) => !neverMade(p)).map((p) => {
-      const c = unitCost(p), mg = p.price - c.total;
-      const r = (n) => Math.round(n / 100) * 100;
-      return row({ what: esc(sxName(p)), sub: c.hasBom ? `Vốn ${num(r(c.total))} · bán ${num(p.price)}` : "Chưa có định mức vật tư",
-        much: c.hasBom ? num(r(mg)) : "—", muchSub: c.hasBom && p.price ? `${Math.round((mg / p.price) * 100)}%` : "", md: true });
-    }).join("")}</ul>`;
+      : `<p class="empty">Tháng ${monthText(m)} chưa bán thùng nào. Chạm vào hình lịch ở góc trên để xem tháng khác.</p>`}`;
   }
 
   // Bánh: nhấn xuống là nhấc miếng lên, buông ra vẫn giữ để đọc số; chạm lại miếng đó hoặc chỗ trống thì đặt xuống.
@@ -1834,7 +1839,7 @@
       if (!path.startsWith("don/moi") && !side) od = null;
       if (!path.startsWith("tien/tra")) delete drafts.tra;
       if (!side) delete drafts.khach;
-      if (!path.startsWith("baocao")) bc = { month: null, slice: null };
+      if (!path.startsWith("baocao")) bc = { month: null, slice: undefined };
       if (!path.startsWith("sx")) sx = { step: 1, product: null, color: null, cartons: 0 };
       lastPath = path;
       render();
@@ -2257,7 +2262,7 @@
         render();
         break;
       case "bc-months": monthsSheet(); break;
-      case "bc-month": bc.month = v; bc.slice = null; closeSheet(); render(); break;
+      case "bc-month": bc.month = v; bc.slice = undefined; closeSheet(); render(); break;
       case "bc-slice": pieSet(bc.slice === v ? null : v); break;
       case "cust-add": setDraft("khach", "name", v); location.hash = `#/khach-moi?ve=${enc(location.hash.slice(1))}`; break;
       case "vt-material": case "vt-supplier": case "dau-supplier": {

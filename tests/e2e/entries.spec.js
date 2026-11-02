@@ -512,23 +512,26 @@ test('Báo cáo: month picker, the two cards, press a slice to read it, and a fr
   await expect(page.locator('h1')).toHaveText(`Báo cáo tháng ${label(lastM)}`);
   await expect(page.locator('.total').first()).toContainText('1.000.000');
   await expect(page.locator('.total').nth(1)).toContainText('Lợi nhuận');
-  await expect(page.locator('.pie-key')).toHaveCount(2);
+  // Doanh thu cao nhất trước; miếng lớn nhất được nhấc sẵn
+  await expect(page.locator('.pie-key span:nth-child(2)')).toHaveText(['1L', 'Hoa sen']);
+  await expect(page.locator('.pie-key b')).toHaveText(['900.000', '100.000']);
+  await expect(page.locator('[data-slice="DAU-0.5"]')).toHaveClass(/on/);
+  await expect(page.locator('#pie-detail')).toContainText('90% doanh thu · 3 thùng');
   await expect(page.locator('main')).not.toContainText('Lãi theo tháng');
+  await expect(page.locator('main')).not.toContainText('Lãi mỗi thùng');
   await expect(page.locator('main')).not.toContainText('Giá vốn tính');
-  await expect(page.getByRole('heading', { name: /Lãi mỗi thùng/ })).toBeVisible();
   // Nhấn lên chính miếng bánh
-  const top = page.locator('[data-slice="DAU-0.5"] .pie-top');
-  const at = await top.evaluate((p) => { const m = p.getPointAtLength(p.getTotalLength() * 0.55), pt = p.ownerSVGElement.createSVGPoint(); pt.x = (m.x + 171.5) / 2; pt.y = (m.y + 106) / 2; const s = pt.matrixTransform(p.getScreenCTM()); return { x: s.x, y: s.y }; });
+  const at = await page.locator('[data-slice="DAU-HS"] .pie-pct').evaluate((t) => { const r = t.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
   await page.mouse.move(at.x, at.y);
   await page.mouse.down();
-  await expect(page.locator('[data-slice="DAU-0.5"]')).toHaveClass(/on/);
-  await expect(page.locator('#pie-detail')).toContainText('1L');
-  await expect(page.locator('#pie-detail')).toContainText('900.000');
-  await expect(page.locator('#pie-detail')).toContainText('90% doanh thu · 3 thùng');
-  await page.mouse.up();
-  await expect(page.locator('[data-slice="DAU-0.5"]')).toHaveClass(/on/);
-  // Hàng chú giải cũng chọn được, không cần chạm trúng miếng nhỏ
-  await page.locator('.pie-key', { hasText: 'Hoa sen' }).click();
+  await expect(page.locator('[data-slice="DAU-HS"]')).toHaveClass(/on/);
+  await expect(page.locator('#pie-detail')).toContainText('100.000');
   await expect(page.locator('#pie-detail')).toContainText('10% doanh thu · 1 thùng');
+  await page.mouse.up();
+  await expect(page.locator('[data-slice="DAU-HS"]')).toHaveClass(/on/);
+  await expect(page.locator('.slice.on')).toHaveCount(1);
+  // Hàng chú giải cũng chọn được, không cần chạm trúng miếng nhỏ
+  await page.locator('.pie-key', { hasText: '1L' }).click();
+  await expect(page.locator('#pie-detail')).toContainText('90% doanh thu · 3 thùng');
   await expect(page.locator('.slice.on')).toHaveCount(1);
 });

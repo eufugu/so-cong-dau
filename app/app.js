@@ -1538,8 +1538,8 @@
   const monthOf = (s) => s.slice(0, 7);
   const costOf = (o) => o.cartons * unitCost(product(o.product) || {}).total;
   // Màu đi theo loại hàng, không theo thứ hạng, nên lọc tháng nào một loại vẫn một màu. Mỗi loại: [ô màu, chữ tối trên miếng sáng].
-  const PIE = { "DAU-0.5": [1, 1], "DAU-0.6": [2, 1], "DAU-0.8": [3, 1], "DAU-1": [4, 0], "DAU-1.3": [5, 1], "DAU-1.5": [6, 0], "DAU-HS": [7, 0],
-    "DAU-1.1": [8, 1], "DAU-1.2": [9, 1], "DAU-1.4": [10, 0], "NEN-TL": [11, 0], "NEN-SH": [12, 0] };
+  const PIE = { "DAU-0.5": [1, 0], "DAU-0.6": [2, 1], "DAU-0.8": [3, 1], "DAU-1": [4, 0], "DAU-1.3": [5, 1], "DAU-1.5": [6, 0], "DAU-HS": [7, 1],
+    "DAU-1.1": [8, 1], "DAU-1.2": [9, 1], "DAU-1.4": [10, 1], "NEN-TL": [11, 0], "NEN-SH": [12, 1] };
   // slice: chưa chọn gì thì nhấc sẵn miếng lớn nhất; null là người dùng đã đặt xuống
   let bc = { month: null, slice: undefined }, pieNow = [];
   const bcMonth = () => bc.month || today().slice(0, 7);
@@ -1573,6 +1573,8 @@
     const cut = (t) => `M${inn(t)} L${out(t)} L${out(t, depth)} L${inn(t, depth)} Z`;
     const shaded = (cls, d, extra = "") => `<path class="${cls}" d="${d}"${extra}/><path class="${cls}-shade pie-shade" d="${d}"${extra}/>`;
     const clip = ' clip-path="url(#pie-hole)"';
+    // Vạch trắng chỉ nằm giữa hai miếng, trên mặt bánh và xuôi theo thành; viền ngoài để trơn
+    const gap = (t) => `<path class="pie-gap" d="M${inn(t)} L${out(t)}${Math.sin(t) > 0 ? ` L${out(t, depth)}` : ""}"/>${Math.sin(t) < 0 ? `<path class="pie-gap" d="M${inn(t)} L${inn(t, depth)}"${clip}/>` : ""}`;
     const piece = (x) => {
       const mid = (x.from + x.to) / 2, big = x.to - x.from > Math.PI;
       const f0 = Math.max(x.from, 0), f1 = Math.min(x.to, Math.PI);
@@ -1584,14 +1586,17 @@
         ${shaded("pie-cut", cut(x.from))}${shaded("pie-cut", cut(x.to))}
         ${f1 > f0 ? shaded("pie-out", wallOut(f0, f1)) : ""}
         <path class="pie-top" d="M${out(x.from)} ${arcOut(x.to, big, 1)} L${inn(x.to)} ${arcIn(x.from, big, 0)} Z"/>
+        ${slices.length > 1 ? [x.from, x.to].map(gap).join("") : ""}
         ${x.share >= 0.06 ? `<text class="pie-pct${x.tone[1] ? " ink" : ""}" x="${lx.toFixed(1)}" y="${ly.toFixed(1)}">${x.pct}%</text>` : ""}
       </g>`;
     };
     const order = [...slices.filter((x) => x.code !== active), ...slices.filter((x) => x.code === active)];
+    // Lõi nhỏ hơn bánh một chút, để không lộ thành viền quanh mép bánh
+    const crx = rx - 2, cry = ry - 2, cd = depth - 2, hrx = irx + 2, hry = iry + 2;
     return `<svg viewBox="0 0 ${w} ${h}" aria-hidden="true" focusable="false">
       <defs><clipPath id="pie-hole"><ellipse cx="${cx}" cy="${cy}" rx="${irx.toFixed(1)}" ry="${iry.toFixed(1)}"/></clipPath></defs>
-      <path class="pie-core-wall" d="${wallOut(0, Math.PI)}"/>
-      <path class="pie-core" fill-rule="evenodd" d="M${cx - rx} ${cy} A${rx} ${ry} 0 1 0 ${cx + rx} ${cy} A${rx} ${ry} 0 1 0 ${cx - rx} ${cy} Z M${cx - irx} ${cy} A${irx.toFixed(1)} ${iry.toFixed(1)} 0 1 0 ${cx + irx} ${cy} A${irx.toFixed(1)} ${iry.toFixed(1)} 0 1 0 ${cx - irx} ${cy} Z"/>
+      <path class="pie-core-wall" d="M${cx - crx} ${cy} A${crx} ${cry} 0 0 0 ${cx + crx} ${cy} L${cx + crx} ${cy + cd} A${crx} ${cry} 0 0 1 ${cx - crx} ${cy + cd} Z"/>
+      <path class="pie-core" fill-rule="evenodd" d="M${cx - crx} ${cy} A${crx} ${cry} 0 1 0 ${cx + crx} ${cy} A${crx} ${cry} 0 1 0 ${cx - crx} ${cy} Z M${cx - hrx} ${cy} A${hrx} ${hry} 0 1 0 ${cx + hrx} ${cy} A${hrx} ${hry} 0 1 0 ${cx - hrx} ${cy} Z"/>
       <g class="pie-slices">${order.map(piece).join("")}</g>
     </svg>`;
   }

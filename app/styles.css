@@ -25,9 +25,9 @@
   --lift: rgba(0, 0, 0, .22);
   --margin: 1px;
   --section: 28px;
-  /* Màu miếng bánh, theo loại hàng. Bảy màu đầu đã qua kiểm tra mù màu cho mọi cặp, vì xếp theo doanh thu thì màu nào cũng có thể nằm cạnh nhau */
-  --pie-1: #1e88e5; --pie-2: #f48fb1; --pie-3: #f57c00; --pie-4: #00897b; --pie-5: #f7c600; --pie-6: #c62828; --pie-7: #0b3c9c;
-  --pie-8: #00b8d4; --pie-9: #8bc400; --pie-10: #6a1b9a; --pie-11: #5d4037; --pie-12: #546e7a;
+  /* Màu miếng bánh, theo loại hàng: lấy từ hình mẫu của chủ (xanh ngọc, xanh thép, xanh bạc hà, xanh nõn chuối) và các sắc đậm nhạt của chúng */
+  --pie-1: #0f7f5c; --pie-2: #7cc8e0; --pie-3: #7edf21; --pie-4: #104977; --pie-5: #00cd9a; --pie-6: #4f7cab; --pie-7: #12a0c2;
+  --pie-8: #b4ec74; --pie-9: #80e6cc; --pie-10: #a7bfd8; --pie-11: #065a67; --pie-12: #5a9a0e;
   --check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 5 5 9-10'/%3E%3C/svg%3E");
   --r: 10px;
   --tap: 56px;
@@ -493,10 +493,13 @@ button[aria-pressed="true"]::before, .picked button::before {
 .pie-core-wall { fill: var(--grid); }
 .slice { cursor: pointer; transition: transform .24s cubic-bezier(.16,1,.3,1); }
 .slice.on { transform: translate(var(--dx), var(--dy)); }
-.pie-top, .pie-out, .pie-in, .pie-cut { fill: var(--c); stroke: var(--paper); stroke-width: 1.5; stroke-linejoin: round; }
-.pie-shade { fill: var(--ink); opacity: .26; stroke: none; pointer-events: none; }
+.pie-out, .pie-in, .pie-cut { fill: var(--c); }
+/* Mặt trên có viền cùng màu cực mảnh để khép khe giữa mặt và thành, mép bánh trơn */
+.pie-top { fill: var(--c); stroke: var(--c); stroke-width: .6; stroke-linejoin: round; }
+.pie-gap { fill: none; stroke: var(--paper); stroke-width: 1.5; stroke-linecap: butt; pointer-events: none; }
+.pie-shade { fill: var(--ink); opacity: .18; stroke: none; pointer-events: none; }
 .pie-in-shade { opacity: .48; }
-.pie-cut-shade { opacity: .38; }
+.pie-cut-shade { opacity: .32; }
 .pie-cut, .pie-cut-shade { display: none; }
 .slice.on .pie-cut, .slice.on .pie-cut-shade { display: inline; }
 .pie-pct { fill: var(--paper); font-size: 0.85rem; font-weight: 700; text-anchor: middle; pointer-events: none; }

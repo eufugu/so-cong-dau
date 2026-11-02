@@ -328,6 +328,76 @@ test('editing an old row offline is blocked with a message; online it works', as
   await expect.poll(async () => (await getDocs('payments'))[0].holder).toBe('Bác Khang');
 });
 
+test('Hôm nay: revenue instead of debt, a calm money row, tap opens the money page', async ({ page }) => {
+  const day = new Date(), d = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
+  await putDoc('orders', 'o-nay', { id: 'o-nay', date: d, deliver: d, customerId: CUST.id, customer: CUST.name, product: 'DAU-0.5', color: 'Đỏ', cartons: 2, price: 360000, status: 'Đã giao', by: 'Excel', void: false });
+  await putDoc('payments', 'p-giu', { id: 'p-giu', date: d, customerId: CUST.id, customer: CUST.name, amount: 300000, method: 'TM', holder: WORKER.name, handed: false, handedDate: null, by: WORKER.name, void: false });
+  await openAs(page, WORKER);
+  await expect(page.locator('.rev-total')).toContainText(`Doanh thu tháng ${day.getMonth() + 1}`);
+  await expect(page.locator('.rev-total b')).toHaveText('720.000');
+  await expect(page.locator('.rev svg rect')).toHaveCount(1);
+  await expect(page.locator('main')).not.toContainText(/nợ/i);
+  await expect(page.getByRole('link', { name: /Ghi sản xuất/ })).toBeVisible();
+  const row = page.locator('.row.plain');
+  await expect(row).toContainText('Bạn đang giữ 1 khoản');
+  await expect(row).toContainText('300.000');
+  await row.click();
+  await expect(page).toHaveURL(/#\/tien\/thu$/);
+});
+
+test('Sản xuất and Lên đơn show the same six kinds; the rest under Loại khác with 1L (Nhỡ)', async ({ page }) => {
+  await openAs(page, WORKER);
+  const six = ['1L', '9 can', '1.4L', '1.8L', '2L', 'Hoa sen'];
+  await page.goto('/#/sx');
+  const tiles = page.locator('.form > .choices .choice');
+  await expect(tiles).toHaveCount(6);
+  for (const [i, n] of six.entries()) await expect(tiles.nth(i)).toContainText(n);
+  await expect(page.locator('details.more')).toContainText('1L (Nhỡ)');
+  await page.goto('/#/don/moi');
+  expect(await page.locator('.order-form > .field > .order-sheet .os-name strong').allInnerTexts()).toEqual(six);
+  await expect(page.locator('details.more .os-name strong').first()).toHaveText('1L (Nhỡ)');
+});
+
+test('Lên đơn: find a customer without diacritics, pick any date, the order keeps that date', async ({ page }) => {
+  await putDoc('customers', 'k-m', { id: 'k-m', name: 'Cậu Minh', phone: '', address: '', by: 'Excel', void: false });
+  await openAs(page, WORKER);
+  await page.goto('/#/don/moi');
+  await expect(page.getByRole('button', { name: 'Giao hôm qua' })).toHaveCount(0);
+  await expect(page.locator('.date-show')).toContainText('Hôm nay');
+  // Danh sách hiện đủ mọi khách khi chưa gõ
+  await expect(page.locator('.cp-list')).toContainText('Khách Thử');
+  await expect(page.locator('.cp-list')).toContainText('Cậu Minh');
+  await expect(page.getByRole('link', { name: 'Khách mới' })).toBeVisible();
+  await page.locator('#od-q').fill('CAU MINH');
+  await expect(page.locator('.cp-item')).toHaveCount(1);
+  // Enter khi chỉ còn một khách thì chọn luôn, không lưu đơn
+  await page.locator('#od-q').press('Enter');
+  await expect(page.locator('.picked button')).toContainText('Cậu Minh');
+  await page.locator('#od-date').fill('2026-10-05');
+  await expect(page.locator('.date-show')).toContainText('Thứ Hai, 05/10');
+  await page.getByRole('textbox', { name: '1L Đỏ, số thùng', exact: true }).fill('2');
+  await page.getByRole('button', { name: 'Lưu đơn' }).click();
+  await expect(page).toHaveURL(/#\/hoadon\/k-m\/2026-10-05$/);
+  await expect.poll(async () => (await getDocs('orders')).length, { timeout: 15000 }).toBe(1);
+  const [o] = await getDocs('orders');
+  expect(o.date).toBe('2026-10-05');
+  expect(o.deliver).toBe('2026-10-05');
+  expect(o.product).toBe('DAU-0.5');
+});
+
+test('Ghi tiền opens with only the customer step; amounts never sit on the names', async ({ page }) => {
+  await putDoc('orders', 'o-1', { id: 'o-1', date: '2026-10-01', deliver: '2026-10-01', customerId: CUST.id, customer: CUST.name, product: 'DAU-0.5', color: 'Đỏ', cartons: 2, price: 360000, status: 'Đã giao', by: 'Excel', void: false });
+  await openAs(page, WORKER);
+  await page.goto('/#/tien/ghi');
+  await expect(page.locator('#pay-amount')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Lưu', exact: true })).toHaveCount(0);
+  await expect(page.locator('.cp-list')).not.toContainText('720.000');
+  await page.getByRole('button', { name: CUST.name, exact: true }).click();
+  await expect(page.locator('#pay-amount')).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Lưu', exact: true })).toBeVisible();
+  await expect(page.locator('form')).toContainText('Còn nợ 720.000');
+});
+
 test('text size survives sign-out', async ({ page }) => {
   await openAs(page, WORKER);
   await page.locator('button.who').click();

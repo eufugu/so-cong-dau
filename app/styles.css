@@ -130,20 +130,24 @@ a.row:active, button.row:active { background: var(--pen-soft); }
 .pay-debt { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px; font-size: 0.9rem; color: var(--ink-2); }
 .save-bar { position: sticky; bottom: var(--tabh, calc(66px + env(safe-area-inset-bottom))); z-index: 5; margin: 0 -16px; padding: 10px 16px; background: var(--paper); border-top: 2px solid var(--grid); }
 .pay-day { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-a.pay-new { display: inline-flex; align-items: center; gap: 6px; min-height: 48px; margin-top: 4px; font-weight: 600; }
-a.pay-new svg { width: 18px; height: 18px; }
-#pay-cust-list .choices { margin-top: 8px; }
-/* Doanh thu 7 ngày: vạch ngang màu mực, không lưới; hôm nay đậm hơn một chút */
+.btn.big { min-height: 64px; font-size: 1.2rem; }
+/* Doanh thu tháng này: số chính nằm trong dải đầu trang, dòng so sánh nhỏ bên dưới */
+.total.rev-total small { display: block; margin-top: 2px; font-size: 0.9rem; font-weight: 500; line-height: 1.35; color: var(--ink-2); }
+.total.rev-total small .nw { margin-left: 0; display: inline-block; }
+/* Doanh thu 7 ngày: cột màu mực trên một đường đáy, không lưới; hôm nay đậm hơn một chút */
 .rev { display: block; padding: 0 16px; color: inherit; text-decoration: none; }
-.rev ul { list-style: none; margin: 0; padding: 0; }
-.rev li { display: flex; align-items: center; gap: 8px; min-height: 40px; }
-.rev-day { flex: none; width: 4.4rem; font-size: 0.9rem; color: var(--ink-2); }
-.rev-bar { flex: none; width: calc(var(--v) * (100% - 8.4rem)); min-width: 3px; height: 16px; border-radius: 0 4px 4px 0; background: var(--pen); opacity: .7; }
-.rev-num { color: var(--pen); font-weight: 500; white-space: nowrap; }
-.rev-num.none { color: var(--ink-2); }
-.rev .now .rev-day { color: var(--ink); font-weight: 600; }
-.rev .now .rev-bar { opacity: 1; }
+.rev svg { display: block; overflow: visible; }
+.rev svg svg { overflow: hidden; }
+.rev text { text-anchor: middle; }
+.rev-bar { fill: var(--pen); opacity: .7; }
+.rev-bar.now { opacity: 1; }
+.rev-base { stroke: var(--edge); stroke-width: 1; }
+.rev-num { fill: var(--pen); font-size: 0.85rem; font-weight: 600; }
+.rev-num.none { fill: var(--ink-2); font-weight: 500; }
+.rev-day { fill: var(--ink-2); font-size: 0.9rem; font-weight: 600; }
+.rev-date { fill: var(--ink-2); font-size: 0.8rem; font-weight: 500; }
 .rev .now .rev-num { font-weight: 700; }
+.rev .now .rev-day, .rev .now .rev-date { fill: var(--ink); font-weight: 700; }
 /* Hôm nay: trang Mẹ mở mỗi ngày, nên nhẹ hơn các trang sổ */
 .calm .total b, .calm .row .much { font-weight: 600; }
 .calm .row.plain .what strong, .calm .row.plain .much { font-weight: 400; }
@@ -268,8 +272,8 @@ details.more.data { margin-top: var(--section); }
 .picked .swatch { width: 30px; height: 30px; }
 
 /* Order sheet: one row per kind, one column per colour, the count typed into the cell */
-.order-sheet { display: grid; gap: 8px; }
-.os-row { display: grid; grid-template-columns: minmax(0, 1.4fr) repeat(3, minmax(0, 1fr)); gap: 8px; align-items: center; }
+.order-sheet { display: grid; gap: 10px; }
+.os-row { display: grid; grid-template-columns: minmax(0, 1.15fr) repeat(3, minmax(0, 1fr)); gap: 8px; align-items: center; }
 .os-row.one .cell { grid-column: span 3; }
 /* Tên màu đi theo khi cuộn, để ô nào cũng biết là màu gì */
 .os-head { min-height: 32px; position: sticky; top: 0; z-index: 2; background: var(--paper); padding: 4px 0; }
@@ -284,8 +288,8 @@ details.more.data { margin-top: var(--section); }
 }
 .price-in:focus { outline: 3px solid var(--pen-soft); outline-offset: 2px; border-bottom-color: var(--pen); color: var(--pen); }
 .cell {
-  width: 100%; min-height: 56px; padding: 2px; border: 2px solid var(--edge); border-radius: var(--r); background: var(--paper);
-  text-align: center; font-size: min(1.5rem, 5.6vw); font-weight: 700; color: var(--pen);
+  width: 100%; min-height: 68px; padding: 2px; border: 2px solid var(--edge); border-radius: var(--r); background: var(--paper);
+  text-align: center; font-size: min(1.8rem, 7.4vw); font-weight: 700; color: var(--pen);
 }
 .cell:focus { outline: 3px solid var(--pen-soft); outline-offset: 0; border-color: var(--pen); }
 .cell.over { border-color: var(--red); color: var(--red); background: var(--red-soft); }
@@ -332,13 +336,31 @@ table.stock thead .swatch.sm { display: block; margin: 0 0 4px auto; }
 /* Lên đơn mới */
 .form h2.sec { margin: calc(var(--section) - 18px) 0 8px; }
 .form > h2.sec:first-child { margin-top: 0; }
-.other-cust { margin-top: 10px; }
+/* Ô ngày: chữ dễ đọc, ô lịch của máy trong suốt phủ lên trên nên chạm vào đâu cũng mở */
+.date-pick { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: var(--tap); padding: 8px 12px; border: 2px solid var(--edge); border-radius: var(--r); background: var(--paper); }
+.date-pick:focus-within { outline: 3px solid var(--pen-soft); border-color: var(--pen); }
+.date-pick > svg { width: 24px; height: 24px; flex: none; color: var(--pen); }
+.date-show { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 10px; min-width: 0; }
+.date-show b { font-size: 1.1rem; font-weight: 600; white-space: nowrap; }
+.date-show small { font-size: 0.9rem; font-weight: 500; color: var(--ink-2); }
+.date-in { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 0; border: 0; opacity: 0; cursor: pointer; -webkit-appearance: none; appearance: none; }
+.date-in::-webkit-calendar-picker-indicator { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 0; cursor: pointer; }
+/* Tìm khách: danh sách cuộn được ngay dưới ô tìm; hở nửa dòng cuối để biết còn nữa */
+.cp-list { margin-top: 8px; max-height: min(19rem, 46dvh); overflow-y: auto; border: 2px solid var(--edge); border-radius: var(--r); background: var(--paper); scrollbar-width: thin; scrollbar-color: var(--edge) transparent; }
+.cp-list ul { list-style: none; margin: 0; padding: 0; }
+.cp-list li + li { border-top: 1px solid var(--line); }
+.cp-item { display: block; width: 100%; min-height: var(--tap); padding: 10px 14px; border: 0; background: none; color: inherit; text-align: left; font-size: 1.05rem; font-weight: 600; line-height: 1.25; overflow-wrap: anywhere; }
+.cp-item:active { background: var(--pen-soft); }
+.cp-item:focus-visible { outline-offset: -3px; }
+.cp-head { position: sticky; top: 0; margin: 0; padding: 6px 14px; background: var(--band); color: var(--ink-2); font-size: 0.9rem; font-weight: 600; }
+.cp-none { margin: 0; padding: 16px 14px; color: var(--ink-2); }
 .cell.filled:not(.over) { border-color: var(--pen); background: var(--pen-soft); }
 .od-bar {
   position: sticky; bottom: var(--tabh, calc(66px + env(safe-area-inset-bottom))); z-index: 5;
   margin: 0 -16px; padding: 8px 16px; background: var(--paper); border-top: 2px solid var(--grid);
   display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center;
 }
+.od-bar.rest { position: static; }
 .od-total b .none { font-size: 1rem; font-weight: 600; color: var(--ink-2); }
 .od-total b { display: block; font-size: min(1.6rem, 6.6vw); line-height: 1.1; font-weight: 700; color: var(--pen); white-space: nowrap; }
 .od-total small { display: block; color: var(--ink-2); font-size: 0.9rem; font-weight: 500; line-height: 1.25; }
@@ -348,7 +370,7 @@ table.stock thead .swatch.sm { display: block; margin: 0 0 4px auto; }
 
 /* A field label with a side link (Khách · + Khách mới) */
 .label-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
-.label-row label { font-weight: 600; }
+.label-row label, .label-row .label { font-weight: 600; }
 .label-row a { display: inline-flex; align-items: center; gap: 4px; min-height: 48px; font-weight: 600; }
 .label-row a svg { width: 18px; height: 18px; }
 .input.qty { font-size: min(1.4rem, 6.5vw); font-weight: 700; color: var(--pen); text-align: right; }

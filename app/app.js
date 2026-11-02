@@ -442,6 +442,10 @@
   function viewGate() {
     const head = (sub) => `<header class="band"><div class="band-top"><div><h1>Sổ công dầu</h1>${sub ? `<p class="sub">${sub}</p>` : ""}</div></div></header>`;
     if (gate === "loading") return `<p class="gate-wait" role="status">Đang mở sổ…</p>`;
+    if (gate === "offline") return head("") + `<div class="form">
+      <p class="warn" role="alert" style="margin:0">Chưa có mạng. Có mạng lại rồi bấm Thử lại.</p>
+      <button class="btn primary big block" data-action="retry-profile">Thử lại</button>
+      <button class="btn big block" data-action="sign-out">Đăng xuất</button></div>`;
     if (gate === "denied") return head("") + `<div class="form">
       <p class="warn" role="alert" style="margin:0">Tài khoản này chưa được cấp quyền. Báo Mẹ hoặc người quản lý.</p>
       <button class="btn big block" data-action="sign-out">Đăng xuất</button></div>`;
@@ -489,12 +493,20 @@
     try { await window.soBackend.signOut(); } catch (e) { /* vẫn tải lại để về màn đăng nhập */ }
     location.reload();
   }
+  let pendingUser = null;
   async function onUser(u) {
-    if (!u) { who = { known: false, uid: null, name: null, role: null }; gate = "signin"; render(); return; }
+    if (!u) { pendingUser = null; who = { known: false, uid: null, name: null, role: null }; gate = "signin"; render(); return; }
     if (who.known && who.uid === u.uid) return;
+    pendingUser = u;
     gate = "loading"; render();
-    const prof = await window.soBackend.profile(u.uid);
-    if (!prof) { gate = "denied"; render(); return; }  // chưa có dòng people: không mở sổ
+    let prof;
+    try { prof = await window.soBackend.profile(u.uid); }
+    catch (e) {
+      // Chưa đọc được dòng people: mất mạng thì cho thử lại, lỗi khác thì báo chung
+      if (e && e.code === "offline") { gate = "offline"; render(); return; }
+      gate = "signin"; gateState.err = SIGNIN_ERR.other; render(); return;
+    }
+    if (!prof) { gate = "denied"; render(); return; }  // server xác nhận chưa có dòng people: không mở sổ
     who = { known: true, uid: u.uid, name: prof.name, role: prof.role };
     gate = "ok";
     startShared(window.soBackend.store);  // chỉ nối sổ sau khi đã đăng nhập, để không bị từ chối
@@ -1814,6 +1826,7 @@
       case "set-user": db.meta.user = v; save(); closeSheet(); render(); toast(`Xin chào ${v}.`); break;
       case "set-size": db.meta.textSize = Number(v); save(); applySize(); whoSheet(); render(); break;
       case "sign-out": doSignOut(); break;
+      case "retry-profile": if (pendingUser) onUser(pendingUser); break;
       case "signin-pick":
         gateState.email = v; gateState.err = "";
         document.querySelectorAll('[data-action="signin-pick"]').forEach((b) => b.setAttribute("aria-pressed", String(b === el)));
@@ -2045,6 +2058,6 @@
   lastPath = route().parts.join("/");
   applySize();
   render();
-  if (canShare) window.soBackend.onUser((u) => { onUser(u); });
+  if (canShare) window.soBackend.onUser((u) => { onUser(u).catch(() => { gate = "signin"; gateState.err = SIGNIN_ERR.other; render(); }); });
   else maybeAsk();
 })();

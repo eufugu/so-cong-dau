@@ -2,7 +2,7 @@
 import { initializeApp } from "firebase/app";
 import {
   initializeFirestore, persistentLocalCache, persistentSingleTabManager, memoryLocalCache,
-  connectFirestoreEmulator, collection, doc, onSnapshot, setDoc, deleteDoc, getDoc,
+  connectFirestoreEmulator, collection, doc, onSnapshot, setDoc, deleteDoc, getDoc as fsGetDoc,
 } from "firebase/firestore";
 import {
   initializeAuth, connectAuthEmulator, indexedDBLocalPersistence, browserLocalPersistence,
@@ -27,10 +27,12 @@ export function errorKind(e) {
 }
 
 // options.emulator: connect to the local emulators.
+// options.readDoc: replaces the Firestore read in tests, to simulate an unreachable server.
 // options.persistent: IndexedDB cache and persistent sign-in. Defaults to true only when
 // IndexedDB exists, so Node tests fall back to memory while real browsers get persistence.
 export function createBackend(config, options = {}) {
   const persistent = options.persistent !== undefined ? options.persistent : typeof indexedDB !== "undefined";
+  const getDoc = options.readDoc || fsGetDoc;
   const app = initializeApp(config, "so-" + appCount++);
   const db = initializeFirestore(app, {
     localCache: persistent ? persistentLocalCache({ tabManager: persistentSingleTabManager() }) : memoryLocalCache(),
@@ -76,15 +78,22 @@ export function createBackend(config, options = {}) {
     },
     signOut: () => fbSignOut(auth),
     onUser: (cb) => onAuthStateChanged(auth, (u) => cb(u ? { uid: u.uid } : null)),
+    // Resolves null ONLY when the server confirms there is no row.
+    // Row unreachable and nothing cached: rejects with { code: "offline" }.
     async profile(uid) {
+      const unreachable = () => cached(uid) || Promise.reject({ code: "offline" });
       let snap;
-      try { snap = await getDoc(doc(db, "people", uid)); } catch (e) { return cached(uid); }
+      try { snap = await getDoc(doc(db, "people", uid)); } catch (e) {
+        // Rules only let a person with a row read people/, so for a login without a row the server answers permission-denied: that is a confirmed "no row"
+        if (e && e.code === "permission-denied") { writeCache(null); return null; }
+        return unreachable();
+      }
       if (snap.exists()) {
         const { name, role } = snap.data();
         writeCache({ uid, name, role });
         return { name, role };
       }
-      if (snap.metadata.fromCache) return cached(uid);
+      if (snap.metadata.fromCache) return unreachable();
       writeCache(null);
       return null;
     },

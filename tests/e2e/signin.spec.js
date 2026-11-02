@@ -115,3 +115,23 @@ test('local mode (no backend) still shows the old picker, for the totals tool', 
   await expect(page.locator('nav.tabs')).toBeVisible();
   await expect(page.getByText('Chỉ lưu trên máy này')).toBeVisible();
 });
+
+test('signed in but the profile cannot be read and is not cached: offline message, then retry opens the app', async ({ page }) => {
+  await signInAs(page, WORKER);
+  await expect(page.getByText(BOOK.name, { exact: true })).toBeVisible({ timeout: 20000 });
+  // Quên bản đã lưu của dòng people (cả bản của app lẫn bản trong bộ nhớ Firestore), rồi chặn đường tới kho
+  await page.evaluate(async () => {
+    localStorage.removeItem('so-cong-dau.v1.nguoi');
+    for (const d of await indexedDB.databases()) if (/firestore/.test(d.name)) indexedDB.deleteDatabase(d.name);
+  });
+  await page.route('**://127.0.0.1:8080/**', (route) => route.abort());
+  await page.reload();
+  await expect(page.getByText('Chưa có mạng. Có mạng lại rồi bấm Thử lại.')).toBeVisible({ timeout: 40000 });
+  await expect(page.getByText('chưa được cấp quyền')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Đăng xuất' })).toBeVisible();
+  await expect(page.locator('nav.tabs')).toBeHidden();
+  await page.unroute('**://127.0.0.1:8080/**');
+  await page.getByRole('button', { name: 'Thử lại' }).click();
+  await expect(page.getByText(BOOK.name, { exact: true })).toBeVisible({ timeout: 20000 });
+  await expect(page.locator('nav.tabs')).toBeVisible();
+});

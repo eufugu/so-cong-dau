@@ -145,6 +145,39 @@ describe('profile', () => {
     } finally { delete globalThis.localStorage; }
   });
 
+  test('rejects with offline when the read fails and nothing is cached', async () => {
+    globalThis.localStorage = mem({});
+    try {
+      const down = createBackend(CONFIG, { emulator: true, readDoc: () => Promise.reject(new Error('unavailable')) });
+      await expect(down.profile('someone')).rejects.toEqual({ code: 'offline' });
+    } finally { delete globalThis.localStorage; }
+  });
+
+  test('a cache-only miss with nothing cached is offline, not missing', async () => {
+    globalThis.localStorage = mem({});
+    try {
+      const miss = createBackend(CONFIG, { emulator: true, readDoc: () => Promise.resolve({ exists: () => false, metadata: { fromCache: true } }) });
+      await expect(miss.profile('someone')).rejects.toEqual({ code: 'offline' });
+    } finally { delete globalThis.localStorage; }
+  });
+
+  test('a cached copy still wins when the read fails', async () => {
+    globalThis.localStorage = mem({ [NGUOI]: JSON.stringify({ uid: 'u1', name: 'Bác Khang', role: 'worker' }) });
+    try {
+      const down = createBackend(CONFIG, { emulator: true, readDoc: () => Promise.reject(new Error('unavailable')) });
+      expect(await down.profile('u1')).toEqual({ name: 'Bác Khang', role: 'worker' });
+    } finally { delete globalThis.localStorage; }
+  });
+
+  test('permission-denied from the server counts as a confirmed missing row', async () => {
+    globalThis.localStorage = mem({ [NGUOI]: JSON.stringify({ uid: 'u1', name: 'Old', role: 'owner' }) });
+    try {
+      const denied = createBackend(CONFIG, { emulator: true, readDoc: () => Promise.reject({ code: 'permission-denied' }) });
+      expect(await denied.profile('u1')).toBeNull();
+      expect(localStorage.getItem(NGUOI)).toBeNull();
+    } finally { delete globalThis.localStorage; }
+  });
+
   test('works when localStorage does not exist', async () => {
     await login();
     expect(await be.profile('nobody')).toBeNull();

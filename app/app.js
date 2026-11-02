@@ -4,7 +4,11 @@
 
   const KEY = "so-cong-dau.v1";
   const OWNER = "Mẹ Liên";
-  const PEOPLE = [OWNER, "Bác Khang", "Người khác"];
+  // Có kết nối: tên lấy từ danh sách tài khoản (người có đăng nhập), thêm "Người khác" để ghi tiền đang ở chỗ người không có tài khoản.
+  // Không có kết nối (máy thử): giữ danh sách cũ, trong đó "Người khác" vẫn là một người dùng máy.
+  const PEOPLE = window.soBackend
+    ? [...new Set((window.SO_PEOPLE || []).map((p) => String(p.name).normalize("NFC"))), "Người khác"]
+    : [OWNER, "Bác Khang", "Người khác"];
   const COLORS = ["Đỏ", "Vàng", "Trắng"];
   const SWATCH = { "Đỏ": "do", "Vàng": "vang", "Trắng": "trang" };
   const WITH_OWNER = [OWNER, "Tài khoản Mẹ"];
@@ -69,10 +73,12 @@
   const SHARED = ["customers", "orders", "payments", "production", "purchases", "batches", "losses", "supplierPays"];
   const REMOTE_KEY = KEY + ".chung";
   const UNSENT_KEY = KEY + ".cho-gui";
+  const LAST_UID_KEY = KEY + ".nguoi-cuoi";  // người cuối cùng dùng máy này, để người khác đăng nhập không nhận lại dòng của họ
   const canShare = !!window.soBackend;
   let remote = null;          // kho chung, khi đã kết nối
-  let sync = canShare ? "loading" : "local";  // local | loading | live | stale | readonly
+  let sync = canShare ? "loading" : "local";  // local | loading | live | stale
   const mirror = {};          // bản đã có trên kho chung: col -> Map(id -> json)
+  const serverRows = {};      // bản kho chung đã xác nhận (không tính dòng đang chờ gửi): col -> Map(id -> dòng)
   const arrived = new Set();  // các mục đã nhận bản đầy đủ từ kho chung
   const shared = () => canShare && sync !== "local";
 
@@ -102,9 +108,11 @@
   }
 
   let db = canShare ? loadShared() : load();
+  let signingOut = false;  // đang đăng xuất: không ghi lại bản lưu tạm nữa
   function save() {
+    if (signingOut) return;
     try { localStorage.setItem(remote || canShare ? REMOTE_KEY : KEY, JSON.stringify(db)); } catch (e) { if (!remote) toast("Điện thoại không lưu được. Vào trang Kho, bấm “Lưu dự phòng” ngay."); }
-    if (remote && sync !== "readonly") pushChanges();
+    if (remote) pushChanges();
   }
 
   // Gửi lên kho chung những dòng vừa thêm, sửa hoặc bỏ
@@ -134,12 +142,23 @@
   }
   function writeFailed(e, col, id) {
     if (mirror[col]) mirror[col].delete(id);  // lần lưu sau sẽ gửi lại
-    if (e && e.code === "invalid_argument") { sync = "readonly"; render(); toast("Bạn chỉ được xem sổ chung, chưa được ghi. Nhờ người tạo trang mời bạn làm người sửa (Editor)."); }
-    else if (e && e.code === "quota_exceeded") toast("Sổ chung đã đầy. Báo người tạo trang để dọn bớt.");
-    else {
-      if (db[col].some((r) => r.id === id)) markUnsent(col, id);
-      toast("Chưa gửi được lên sổ chung. Có mạng lại sẽ tự gửi.");
+    const kind = window.soBackend.errorKind(e);
+    if (kind === "refused") {
+      // Kho chung từ chối dòng này (không đủ quyền): bỏ dòng, không gửi lại. Dòng đã có sẵn trên kho thì trả về bản của kho.
+      db[col] = db[col].filter((r) => r.id !== id);
+      unsent[col] = (unsent[col] || []).filter((x) => x !== id); keepUnsent();
+      const had = serverRows[col] && serverRows[col].get(id);
+      if (had) {
+        db[col].push(JSON.parse(JSON.stringify(had)));
+        (mirror[col] || (mirror[col] = new Map())).set(id, JSON.stringify(had));  // bản này đã nằm trên kho: không gửi lại
+      }
+      save(); render();
+      toast("Sổ chung không nhận dòng này: bạn chưa có quyền. Dòng đã được bỏ.");
+      return;
     }
+    if (db[col].some((r) => r.id === id)) markUnsent(col, id);
+    if (e && e.code === "resource-exhausted") toast("Sổ chung đã hết lượt ghi hôm nay. Dòng này sẽ tự gửi lại sau.");
+    else toast("Chưa gửi được lên sổ chung. Có mạng lại sẽ tự gửi.");
   }
 
   let renderLater = false;
@@ -162,11 +181,19 @@
         const have = new Set(got.map((r) => r.id)), waiting = new Set(unsent[col] || []);
         const mine = db[col].filter((r) => waiting.has(r.id) && !have.has(r.id));
         db[col] = got.concat(mine);
-        unsent[col] = mine.map((r) => r.id); keepUnsent();
+        // Dòng đã nằm trong máy của kho chung nhưng chưa được kho xác nhận cũng còn là "chưa gửi"
+        const pending = new Set(snap.docs.filter((d) => d.metadata.hasPendingWrites).map((d) => d.id));
+        unsent[col] = mine.map((r) => r.id).concat([...waiting].filter((id) => pending.has(id))); keepUnsent();
         mirror[col] = new Map(got.map((r) => [r.id, JSON.stringify(r)]));
+        const prev = serverRows[col] || new Map(), confirmed = new Map();
+        snap.docs.forEach((d) => {
+          if (!d.metadata.hasPendingWrites) confirmed.set(d.id, { ...d.data(), id: d.id });
+          else if (prev.has(d.id)) confirmed.set(d.id, prev.get(d.id));  // đang sửa: vẫn nhớ bản của kho
+        });
+        serverRows[col] = confirmed;
         if (!snap.metadata.fromCache) {
           arrived.add(col);
-          if (mine.length && sync !== "readonly") pushChanges();
+          if (mine.length) pushChanges();
         }
         if (arrived.size === SHARED.length && (sync === "loading" || sync === "stale")) { sync = "live"; clearTimeout(timer); }
         try { localStorage.setItem(REMOTE_KEY, JSON.stringify(db)); } catch (e) { /* chỉ là bản tạm */ }
@@ -178,7 +205,6 @@
   // Ghi dòng mới thì lúc nào cũng được (chưa có mạng thì để dành gửi sau).
   // Sửa hay hủy dòng cũ thì phải chờ nhận xong sổ chung, để không ghi đè lên số của người khác.
   function blocked(adding) {
-    if (sync === "readonly") { toast("Bạn chỉ được xem sổ chung, chưa được ghi."); return true; }
     if (!adding && (sync === "loading" || sync === "stale")) { toast("Chưa kết nối sổ chung. Sửa hay hủy dòng cũ cần có mạng."); return true; }
     return false;
   }
@@ -488,9 +514,21 @@
     }
     gateState.busy = false;
   }
-  // Đăng xuất: Task 7 sẽ chen vào đây lời nhắc "còn dòng chưa gửi" trước khi đăng xuất
-  async function doSignOut() {
+  // Đăng xuất: còn dòng chưa gửi thì nhắc trước; đã đăng xuất thì xoá sạch bản sổ và dòng chờ gửi trên máy,
+  // để người khác dùng máy này không thấy hay nhận lại dòng của người trước.
+  function forgetBook() {
+    try { localStorage.removeItem(REMOTE_KEY); localStorage.removeItem(UNSENT_KEY); } catch (e) { /* không có bộ nhớ */ }
+  }
+  async function doSignOut(sure) {
+    const n = unsentCount();
+    if (n > 0 && !sure) {
+      confirmSheet("Đăng xuất?", `Còn ${n} dòng chưa gửi. Đăng xuất bây giờ có thể mất các dòng này.`, "Vẫn đăng xuất", () => { setTimeout(() => doSignOut(true), 0); }, true, "Ở lại");
+      return;
+    }
+    signingOut = true;
+    forgetBook();
     try { await window.soBackend.signOut(); } catch (e) { /* vẫn tải lại để về màn đăng nhập */ }
+    forgetBook();
     location.reload();
   }
   let pendingUser = null;
@@ -507,7 +545,11 @@
       gate = "signin"; gateState.err = SIGNIN_ERR.other; render(); return;
     }
     if (!prof) { gate = "denied"; render(); return; }  // server xác nhận chưa có dòng people: không mở sổ
-    who = { known: true, uid: u.uid, name: prof.name, role: prof.role };
+    // Người khác với người dùng máy lần trước: bỏ bản sổ và dòng chờ gửi của người đó trước khi nối sổ
+    let last = null;
+    try { last = localStorage.getItem(LAST_UID_KEY); localStorage.setItem(LAST_UID_KEY, u.uid); } catch (e) { /* không có bộ nhớ */ }
+    if (last && last !== u.uid) { forgetBook(); unsent = {}; db = loadShared(); }
+    who = { known: true, uid: u.uid, name: String(prof.name).normalize("NFC"), role: prof.role };
     gate = "ok";
     startShared(window.soBackend.store);  // chỉ nối sổ sau khi đã đăng nhập, để không bị từ chối
     render();
@@ -591,7 +633,6 @@
       loading: "Đang tải sổ chung…",
       stale: n ? `Chưa có mạng · ${n} dòng chờ gửi` : "Chưa kết nối được sổ chung. Số có thể chưa mới.",
       live: n ? `Sổ chung · đang gửi ${n} dòng` : "Sổ chung",
-      readonly: "Sổ chung · bạn chỉ được xem",
       local: "Chỉ lưu trên máy này",
     }[sync];
     return t ? `<p class="sync ${sync}" role="status">${t}</p>` : "";
@@ -658,7 +699,7 @@
     const mainBtn = isOwner()
       ? (outTotal > 0 ? `<div class="actions">${unk
         ? `<button class="btn primary big stacked" data-action="ask-next"><span>Ai đang cầm ${unk.items.length > 1 ? `${unk.items.length} khoản tiền` : "khoản tiền này"}?</span><b>${money(unk.total)}</b></button>`
-        : `<a class="btn primary big stacked" href="#/tien/thu"><span>${ICON.check}Nhận tiền ${out.length === 1 ? `từ ${esc(out[0].holder)}` : "đang ở chỗ người khác"}</span><b>${money(outTotal)}</b></a>`}</div>` : "")
+        : `<a class="btn primary big stacked" href="#/tien/thu"><span>${ICON.check}${out.length === 1 && WITH_OWNER.includes(out[0].holder) ? "Xác nhận Mẹ đã nhận tiền" : out.length === 1 ? `Nhận tiền từ ${esc(out[0].holder)}` : "Nhận tiền đang ở chỗ người khác"}</span><b>${money(outTotal)}</b></a>`}</div>` : "")
       : `<div class="actions"><a class="btn primary big" href="#/sx">${ICON.plus}Ghi sản xuất hôm nay</a></div>`;
     const holyText = holy ? (holy.days === 0 ? ` · hôm nay là ${holy.name}` : ` · ${holy.days} ngày nữa tới ${holy.name}`) : "";
 
@@ -953,6 +994,8 @@
     const c = d.customer ? customer(d.customer) : null;
     const owedTrips = c ? c.trips.filter((t) => t.owed > 0) : [];
     const holders = d.method === "CK" ? CK_HOLDERS : PEOPLE;
+    // Chủ cũ không còn trong danh sách vẫn phải hiện nếu đang được chọn
+    const shown = d.holder && !holders.includes(d.holder) && !OTHER.includes(d.holder) ? [...holders, d.holder] : holders;
     // Người đang nợ lên trước, rồi tới khách mua gần đây
     const quick = [...new Set([...(d.customer ? [d.customer] : []), ...debtors().map((x) => x.id), ...recentCustomers(6)])].slice(0, 6);
     return band({ title: "Ghi tiền khách trả", back: id ? `#/khach/${enc(id)}` : "#/tien" }) + `
@@ -985,14 +1028,14 @@
       ${d.method ? `<div class="field">
         <span class="label" id="lbl-holder">${d.method === "CK" ? "Chuyển vào tài khoản ai?" : "Ai đang cầm tiền này?"}</span>
         <div class="choices two" role="group" aria-labelledby="lbl-holder">
-          ${holders.map((h) => `<button type="button" class="choice" data-action="pay-holder" data-v="${esc(h)}" aria-pressed="${d.holder === h}">${esc(h)}</button>`).join("")}
+          ${shown.map((h) => `<button type="button" class="choice" data-action="pay-holder" data-v="${esc(h)}" aria-pressed="${d.holder === h}">${esc(h)}</button>`).join("")}
         </div>
         ${OTHER.includes(d.holder) ? (() => { const ck = d.holder !== "Người khác", names = otherNames(ck); return `<label for="pay-other" class="sub-label">${ck ? "Tài khoản của ai?" : "Người đó là ai?"}</label>
         <input class="input" id="pay-other" autocomplete="off" maxlength="40" value="${esc(d.other)}">
         ${names.length ? `<div class="chips">${names.map((n) => { const nm = ck ? n.replace(/^Tài khoản /, "") : n; return `<button type="button" class="chip" data-action="pay-other" data-v="${esc(nm)}">${esc(nm)}</button>`; }).join("")}</div>` : ""}`; })() : ""}
-        <p class="hint">${WITH_OWNER.includes(d.holder) ? "Tiền đã ở chỗ Mẹ." : "Tiền này sẽ nằm trong mục “Chưa về tay Mẹ” cho tới khi Mẹ bấm đã nhận."}</p>
+        <p class="hint">${holderGetsMoney(d.holder) ? "Tiền đã ở chỗ Mẹ." : WITH_OWNER.includes(d.holder) ? "Mẹ sẽ bấm đã nhận khi nhận đủ tiền." : "Tiền này sẽ nằm trong mục “Chưa về tay Mẹ” cho tới khi Mẹ bấm đã nhận."}</p>
       </div>` : ""}
-      ${owedTrips.length > 1 ? `<div class="field">
+      ${owedTrips.length > 1 && canSplit() ? `<div class="field">
         <span class="label" id="lbl-split">Tiền này trả cho chuyến nào?</span>
         <div class="choices two" role="group" aria-labelledby="lbl-split">
           <button type="button" class="choice" data-action="pay-split" data-v="" aria-pressed="${!d.split}">Chuyến cũ trước</button>
@@ -1689,8 +1732,13 @@
     const w = document.querySelector(".form .warn[role=alert]");
     if (w) { w.tabIndex = -1; w.focus(); }
   });
-  const stamp = () => ({ by: me(), void: false, createdAt: new Date().toISOString() });
+  const stamp = () => ({ by: me() ? me().normalize("NFC") : me(), void: false, createdAt: new Date().toISOString() });
 
+  // Tiền đã về tay Mẹ ngay lúc ghi? Mẹ ghi thì có; người khác chỉ khi tiền vào "Tài khoản Mẹ".
+  // Người khác ghi "Mẹ Liên đang cầm" thì Mẹ còn phải tự bấm đã nhận (kho chung cũng không nhận khác đi). Máy thử thì như cũ.
+  // Chia tiền cho từng chuyến chỉ Mẹ làm được (kho chung không nhận `alloc` từ người khác)
+  const canSplit = () => !canShare || isOwner();
+  const holderGetsMoney = (holder) => WITH_OWNER.includes(holder) && (!canShare || isOwner() || holder === "Tài khoản Mẹ");
   function savePayment() {
     const d = payDraft;
     if (!d.customer) { d.error = "Chưa chọn khách. Chọn tên khách ở ô trên cùng."; return render(); }
@@ -1698,13 +1746,14 @@
     if (!d.method) { d.error = "Chưa chọn trả bằng gì. Chọn Tiền mặt hay Chuyển khoản."; return render(); }
     const holder = OTHER.includes(d.holder) ? holderOf(d.holder, d.other) : d.holder;
     if (!holder) { d.error = d.holder === "Người khác" ? "Chưa ghi tên người đang cầm tiền." : "Chưa ghi tiền vào tài khoản của ai."; return render(); }
-    const trips = d.split ? customer(d.customer).trips.filter((t) => t.owed > 0) : [];
-    const bad = d.split ? allocError(trips, d) : "";
+    const trips = d.split && canSplit() ? customer(d.customer).trips.filter((t) => t.owed > 0) : [];
+    const bad = d.split && canSplit() ? allocError(trips, d) : "";
     if (bad) { d.error = bad; return render(); }
-    const alloc = d.split ? allocList(d.alloc) : [];
+    const alloc = d.split && canSplit() ? allocList(d.alloc) : [];
+    const got = holderGetsMoney(holder);
     const p = {
       id: uid(), date: d.date || today(), customerId: d.customer, customer: cname(d.customer), amount: d.amount, method: d.method,
-      holder, handed: WITH_OWNER.includes(holder), handedDate: WITH_OWNER.includes(holder) ? d.date : null, ...(alloc.length ? { alloc } : {}), ...stamp(),
+      holder, handed: got, handedDate: got ? d.date : null, ...(alloc.length ? { alloc } : {}), ...stamp(),
     };
     addRec("payments", p); save(); if (p.handed) fresh.add(p.id);
     const id = d.customer; payDraft = null;
@@ -1841,7 +1890,7 @@
       case "pay-fill": payDraft.amount = Number(v); render(); break;
       case "pay-method":
         payDraft.method = v;
-        payDraft.holder = v === "CK" ? "Tài khoản Mẹ" : me() === "Người khác" ? "Người khác" : me() || OWNER;
+        payDraft.holder = v === "CK" ? "Tài khoản Mẹ" : !canShare && me() === "Người khác" ? "Người khác" : me() || OWNER;
         payDraft.other = "";
         render(); break;
       case "pay-holder": payDraft.holder = v; payDraft.other = ""; render(); break;
@@ -1899,7 +1948,7 @@
       }
       case "claim-yes": {
         const p = db.payments.find((x) => x.id === id); if (!p || p.holder !== "Chưa ghi" || !me()) break;
-        if (OTHER.includes(me())) { otherSheet(p, "Người khác"); break; }
+        if (!canShare && me() === "Người khác") { otherSheet(p, "Người khác"); break; }
         p.holder = me();
         stepOn(`Đã ghi ${me()} đang cầm ${money(p.amount)}.`, () => { p.holder = "Chưa ghi"; });
         break;

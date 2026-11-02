@@ -75,8 +75,8 @@ main { flex: 1; padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
 .sync { margin: 6px 0 0; font-size: 0.85rem; font-weight: 600; color: var(--ink-2); display: flex; align-items: center; gap: 6px; }
 .sync::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--edge); flex: none; }
 .sync.live::before { background: var(--ok); }
-.sync.stale, .sync.readonly { color: var(--red); }
-.sync.stale::before, .sync.readonly::before { background: var(--red); }
+.sync.stale { color: var(--red); }
+.sync.stale::before { background: var(--red); }
 .who {
   flex: none; min-height: 44px; padding: 0 12px; border-radius: 999px;
   border: 2px solid var(--edge); background: var(--paper); font-weight: 600; font-size: 0.9rem;

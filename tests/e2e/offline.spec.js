@@ -27,7 +27,7 @@ const unsentTotal = (page) => page.evaluate((k) => Object.values(JSON.parse(loca
 
 async function openAs(page, person, url = '/') {
   await page.goto(url);
-  await page.getByRole('button', { name: person.name }).click();
+  await page.getByRole('button', { name: person.shown || person.name }).click();
   await page.getByLabel('Mã PIN').fill(person.pin);
   await page.getByRole('button', { name: 'Đăng nhập' }).click();
   await ready(page);
@@ -85,7 +85,7 @@ for (const person of [WORKER, OWNER]) {
     await expect(roleNote(page, person)).toBeVisible();
     await context.setOffline(true);
     await page.reload();
-    await expect(page.locator('button.who')).toContainText(person.name, { timeout: 20000 });
+    await expect(page.locator('button.who')).toContainText(person.shown || person.name, { timeout: 20000 });
     await expect(page.getByLabel('Mã PIN')).toHaveCount(0);
     await expect(roleNote(page, person)).toBeVisible();
   });

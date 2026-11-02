@@ -12,7 +12,7 @@ test.beforeEach(async ({ page }) => {
 
 test('signed out: names and a PIN box, no book data, no tabs', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByRole('button', { name: 'Mẹ Liên' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Liên', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Bác Khang' })).toBeVisible();
   const pin = page.getByLabel('Mã PIN');
   await expect(pin).toBeVisible();
@@ -41,7 +41,7 @@ test('wrong PIN shows a message and clears the box', async ({ page }) => {
 test('offline first sign-in shows the offline message', async ({ page, context }) => {
   await page.goto('/');
   await context.setOffline(true);
-  await page.getByRole('button', { name: 'Mẹ Liên' }).click();
+  await page.getByRole('button', { name: 'Liên', exact: true }).click();
   await page.getByLabel('Mã PIN').fill(OWNER.pin);
   await page.getByRole('button', { name: 'Đăng nhập' }).click();
   await expect(page.getByText('Chưa có mạng. Cần có mạng để đăng nhập lần đầu.')).toBeVisible();
@@ -72,7 +72,7 @@ test('a login with no people row is told it has no permission, with sign-out', a
   await addAccount(ghost); // không có role: không có dòng people
   await givePeople(page, [ghost]);
   await signInAs(page, ghost);
-  await expect(page.getByText('Tài khoản này chưa được cấp quyền. Báo Mẹ hoặc người quản lý.')).toBeVisible();
+  await expect(page.getByText('Tài khoản này chưa được cấp quyền. Báo Liên hoặc người quản lý.')).toBeVisible();
   await expect(page.locator('nav.tabs')).toBeHidden();
   await page.getByRole('button', { name: 'Đăng xuất' }).click();
   await expect(page.getByLabel('Mã PIN')).toBeVisible();
@@ -82,12 +82,12 @@ test('worker sees no Báo cáo page, owner does', async ({ page }) => {
   await signInAs(page, WORKER);
   await expect(page.getByText(BOOK.name, { exact: true })).toBeVisible({ timeout: 20000 });
   await page.goto('/#/baocao');
-  await expect(page.getByText('Chỉ Mẹ xem được trang này.')).toBeVisible();
+  await expect(page.getByText('Chỉ Liên xem được trang này.')).toBeVisible();
   await page.getByRole('link', { name: 'Quay lại' }).click();
   await page.getByRole('button', { name: /Bác Khang/ }).click();
   await page.getByRole('button', { name: 'Đăng xuất' }).click();
   await expect(page.getByLabel('Mã PIN')).toBeVisible();
-  await page.getByRole('button', { name: 'Mẹ Liên' }).click();
+  await page.getByRole('button', { name: 'Liên', exact: true }).click();
   await page.getByLabel('Mã PIN').fill(OWNER.pin);
   await page.getByRole('button', { name: 'Đăng nhập' }).click();
   await expect(page.getByText(BOOK.name, { exact: true })).toBeVisible({ timeout: 20000 });

@@ -6,7 +6,7 @@ const PROJECT = 'demo-so-cong-dau';
 const AUTH = 'http://127.0.0.1:9099';
 const STORE = 'http://127.0.0.1:8080';
 
-export const OWNER = { name: 'Mẹ Liên', pin: '482915', role: 'owner' };
+export const OWNER = { name: 'Mẹ Liên', shown: 'Liên', pin: '482915', role: 'owner' };
 export const WORKER = { name: 'Bác Khang', pin: '735061', role: 'worker' };
 
 export async function clearAll() {
@@ -41,7 +41,7 @@ export async function givePeople(page, people) {
 
 export async function signInAs(page, person) {
   await page.goto('/');
-  await page.getByRole('button', { name: person.name }).click();
+  await page.getByRole('button', { name: person.shown || person.name }).click();
   await page.getByLabel('Mã PIN').fill(person.pin);
   await page.getByRole('button', { name: 'Đăng nhập' }).click();
 }

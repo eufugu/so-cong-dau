@@ -14,6 +14,9 @@
   const WITH_OWNER = [OWNER, "Tài khoản Mẹ"];
   // Chuyển khoản thì ghi rõ vào tài khoản của ai
   const CK_HOLDERS = ["Tài khoản Mẹ", "Tài khoản Bác Khang", "Tài khoản người khác"];
+  // Tên hiển thị: dòng đã lưu vẫn ghi "Mẹ Liên", "Tài khoản Mẹ" (đừng đổi, sổ và luật của kho chung so theo các tên này); trên màn hình gọi là Liên
+  const SHOWN = { [OWNER]: "Liên", "Tài khoản Mẹ": "Tài khoản Liên" };
+  const nameOf = (s) => SHOWN[String(s ?? "").normalize("NFC")] || s;
 
   // ---------- Lưu trữ ----------
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -383,7 +386,10 @@
     const bought = sum(trips, (t) => t.amount);
     return { id, name: cname(id), trips, pays, paid, bought, debt: bought - paid, info: custById(id) || {} };
   }
-  const owedText = (c) => { const o = c.trips.filter((x) => x.owed > 0); return o.length > 1 ? `${o.length} chuyến chưa trả, từ ${dm(o[0].date)}` : o.length ? `Nợ chuyến ${dm(o[0].date)}` : ""; };
+  // Nợ bao lâu rồi: quá 14 ngày thì chữ đỏ, số tiền vẫn giữ màu cũ
+  const ageTag = (d) => { const n = daysSince(d); return `<span class="age${n > 14 ? " late" : ""}">${n ? `${n} ngày` : "hôm nay"}</span>`; };
+  const oldestOwed = (c) => (c.trips.find((x) => x.owed > 0) || {}).date;
+  const owedText = (c) => { const o = c.trips.filter((x) => x.owed > 0); return o.length > 1 ? `${o.length} chuyến chưa trả, từ ${dm(o[0].date)} · ${ageTag(o[0].date)}` : o.length ? `Nợ chuyến ${dm(o[0].date)} · ${ageTag(o[0].date)}` : ""; };
   const debtors = () => customerIds().map(customer).filter((c) => c.debt > 0).sort((a, b) => b.debt - a.debt);
 
   function outsideMoney() {
@@ -513,7 +519,7 @@
       <button class="btn primary block" data-action="retry-profile">Thử lại</button>
       <button class="btn block" data-action="sign-out">Đăng xuất</button></div>`;
     if (gate === "denied") return head("") + `<div class="form">
-      <p class="warn flush" role="alert">Tài khoản này chưa được cấp quyền. Báo Mẹ hoặc người quản lý.</p>
+      <p class="warn flush" role="alert">Tài khoản này chưa được cấp quyền. Báo Liên hoặc người quản lý.</p>
       <button class="btn block" data-action="sign-out">Đăng xuất</button></div>`;
     const list = window.SO_PEOPLE || [];
     if (!list.length) return head("") + `<p class="empty">Chưa có tài khoản nào. Báo người quản lý.</p>`;
@@ -521,7 +527,7 @@
       <div class="field">
         <span class="label" id="lbl-signin-who">Bạn là ai?</span>
         <div class="choices two" role="group" aria-labelledby="lbl-signin-who">
-          ${list.map((p) => `<button type="button" class="choice" data-action="signin-pick" data-v="${esc(p.email)}" aria-pressed="${p.email === gateState.email}">${esc(p.name)}</button>`).join("")}
+          ${list.map((p) => `<button type="button" class="choice" data-action="signin-pick" data-v="${esc(p.email)}" aria-pressed="${p.email === gateState.email}">${esc(nameOf(p.name))}</button>`).join("")}
         </div>
       </div>
       <div class="field">
@@ -686,12 +692,12 @@
     }[sync];
     return t ? `<p class="sync ${sync}" role="status">${t}</p>` : "";
   }
-  function band({ title, sub = "", back = null, totals = "", exact = false }) {
+  function band({ title, sub = "", back = null, totals = "", exact = false, side = "" }) {
     return `<header class="band${back ? " compact" : ""}">
       ${back ? `<a class="btn back" href="${back}">${ICON.back}Quay lại</a>` : ""}
       <div class="band-top">
         <h1>${title}</h1>
-        ${back ? "" : `<button class="who" data-action="who" aria-label="Người đang dùng: ${esc(me() || "chưa chọn")}. Bấm để ${canShare ? "mở bảng chọn" : "đổi"}">${ICON.user}${esc(me() || "Chọn người")}</button>`}
+        ${back ? side : `<button class="who" data-action="who" aria-label="Người đang dùng: ${esc(nameOf(me()) || "chưa chọn")}. Bấm để ${canShare ? "mở bảng chọn" : "đổi"}">${ICON.user}${esc(nameOf(me()) || "Chọn người")}</button>`}
       </div>
       ${sub ? `<p class="sub">${sub}</p>` : ""}${syncNote()}
       ${totals ? `<div class="totals${exact ? " exact" : ""}">${totals}</div>` : ""}
@@ -759,7 +765,7 @@
     const barTop = Math.round(1.25 * rem), base = barTop + 96, h = base + Math.round((dated ? 2.6 : 1.5) * rem);
     const col = (i) => `${(i + 0.5) * (100 / 7)}%`, wide = `${(100 / 7) * 0.62}%`;
     const spoken = days.map((d, i) => { const w = new Date(d + "T00:00:00"); return `${WEEKDAY[w.getDay()]} ${dm(d)}: ${rev[i] ? `${num(rev[i])} đồng` : "chưa bán"}`; }).join("; ");
-    return `<h2 class="sec">Doanh thu 7 ngày <small>đơn vị: triệu đồng</small></h2>
+    return `<h2 class="sec">Doanh thu 7 ngày <small>Đơn vị: triệu đồng</small></h2>
     <a class="rev" href="#/don" aria-label="Doanh thu 7 ngày. ${spoken}. Chạm để xem đơn hàng.">
       <svg width="100%" height="${h}" aria-hidden="true" focusable="false">
         <svg width="100%" height="${base}">${days.map((d, i) => { const v = Math.max(3, Math.round((rev[i] / top) * 96));
@@ -774,17 +780,11 @@
       </svg>
     </a>`;
   }
-  // Doanh thu tháng này: so với tháng trước tới cùng ngày, vì đầu tháng mà so với cả tháng thì lúc nào cũng thấy tụt
+  // Doanh thu tháng này; chạm vào mở Báo cáo đúng tháng này
   function revenueCard() {
-    const now = new Date(), month = today().slice(0, 7), prev = lastMonth(), sold = soldOrders();
-    const inMonth = (m) => sold.filter((o) => monthOf(soldDay(o)) === m);
-    const rev = sum(inMonth(month), orderValue), day = now.getDate();
-    const prevAll = inMonth(prev), prevRev = sum(prevAll, orderValue);
-    const prevSoFar = sum(prevAll.filter((o) => Number(soldDay(o).slice(8)) <= day), orderValue);
-    const prevDays = new Date(now.getFullYear(), now.getMonth(), 0).getDate();
-    const cmp = !prevRev ? `Tháng ${mo(prev)} chưa có số để so.`
-      : `${day < prevDays ? `<span class="nw">Tháng ${mo(prev)} tới ngày ${day}: ${prevSoFar ? num(prevSoFar) : "chưa bán"}</span> ` : ""}<span class="nw">Cả tháng ${mo(prev)}: ${num(prevRev)}</span>`;
-    return `<a class="total rev-total" href="#/baocao"><span>Doanh thu tháng ${mo(month)}</span><b>${rev ? num(rev) : NONE}</b><small>${cmp}</small></a>`;
+    const month = today().slice(0, 7);
+    const rev = sum(soldOrders().filter((o) => monthOf(soldDay(o)) === month), orderValue);
+    return `<a class="total" href="#/baocao"><span>Doanh thu tháng ${mo(month)}</span><b>${rev ? num(rev) : NONE}</b></a>`;
   }
 
   function viewHome() {
@@ -812,13 +812,13 @@
     const unk = out.find((g) => g.holder === "Chưa ghi"), mine = out.find((g) => g.holder === me());
     const withMe = out.length === 1 && WITH_OWNER.includes(out[0].holder);
     const moneyRow = isOwner()
-      ? outTotal > 0 ? row({ ...(unk ? { action: 'data-action="ask-next"' } : { href: "#/tien/thu" }), what: `Còn ${outCount} khoản tiền ${withMe ? "Mẹ chưa xác nhận" : "chưa đưa Mẹ"}`, much: num(outTotal), md: true, cls: "plain" }) : ""
+      ? outTotal > 0 ? row({ ...(unk ? { action: 'data-action="ask-next"' } : { href: "#/tien/thu" }), what: `Còn ${outCount} khoản tiền ${withMe ? "Liên chưa xác nhận" : "chưa đưa Liên"}`, much: num(outTotal), md: true, cls: "plain" }) : ""
       : mine ? row({ href: "#/tien/thu", what: `Bạn đang giữ ${mine.items.length} khoản`, much: num(mine.total), md: true, cls: "plain" }) : "";
     const holyText = holy ? (holy.days === 0 ? ` · hôm nay là ${holy.name}` : ` · ${holy.days} ngày nữa tới ${holy.name}`) : "";
 
     return `<div class="calm">` + band({
       title: `${WEEKDAY[now.getDay()]}, ${dm(today())}`,
-      sub: `Âm lịch <b>${l.day}/${l.month}${l.leap ? " nhuận" : ""}</b> ${Lunar.yearName(l.year)}${holyText}`,
+      sub: `<span class="lunar">Âm lịch ${l.day}/${l.month}${l.leap ? " nhuận" : ""} ${Lunar.yearName(l.year)}</span>${holyText}`,
       // Doanh thu chỉ Mẹ xem
       totals: isOwner() ? revenueCard() : "",
     }) + `
@@ -830,7 +830,7 @@
       ${row({ href: "#/kho", what: "Thùng trong kho", much: num(totalCartons), muchSub: "thùng" })}
       ${t ? row({ href: "#/kho#tec", what: "Téc còn dầu", much: tanks(t.est), muchSub: "téc", cls: t.est <= 3 ? "alert" : "" }) : ""}
       ${row({ href: "#/kho#vattu", what: "Vật tư cần đặt", much: String(mats.length), muchSub: "loại", cls: mats.length ? "alert" : "done" })}
-      ${row({ href: "#/sx", what: "Hôm nay đã làm được", sub: todays.length ? todays.slice(0, 2).map((x) => esc(label(product(x.product), x.color))).join(", ") + (todays.length > 2 ? "…" : "") : late && !isOwner() ? "Chiều rồi mà chưa ghi. Nhớ ghi nhé!" : "Chưa ghi thùng nào", much: todayCartons ? String(todayCartons) : '<span class="none">—</span>', muchSub: todayCartons ? "thùng" : "" })}
+      ${row({ href: "#/sx", what: "Hôm nay đã làm được", sub: todays.length ? "" : late && !isOwner() ? "Chiều rồi mà chưa ghi. Nhớ ghi nhé!" : "Chưa ghi thùng nào", much: todayCartons ? String(todayCartons) : '<span class="none">—</span>', muchSub: todayCartons ? "thùng" : "" })}
       ${isOwner() ? (revMonth || !soldPrev.length
         ? row({ href: "#/baocao", what: `Lãi tháng ${Number(month.slice(5))}`, sub: revMonth ? "" : "Tháng này chưa bán thùng nào", much: revMonth ? num(Math.round(profitMonth / 1000) * 1000) : "—", md: true })
         : row({ href: "#/baocao", what: `Lãi tháng ${Number(prevMonth.slice(5))}`, sub: `Tháng ${Number(month.slice(5))} chưa bán thùng nào`, much: num(Math.round(profitPrev / 1000) * 1000), md: true })) : ""}
@@ -859,7 +859,7 @@
     </table></div>`}
     <h2 class="sec">Nến</h2>
     <ul class="ledger">${candles.map((p) => { const rare = SX_RARE.includes(p.code), st = rare ? "" : productStatus(p);
-      return row({ what: esc(p.name), sub: st ? `<span class="stamp red">${st}</span>` : rare ? "Ít khi làm" : `${p.cansPerCarton} cái một thùng`, much: stockTotal(p) > 0 ? num(stockTotal(p)) : '<span class="none">Hết</span>', muchSub: stockTotal(p) > 0 ? "thùng" : "", md: true, cls: st ? "alert" : rare ? "done" : "" }); }).join("")}</ul>
+      return row({ what: esc(p.name), sub: st ? `<span class="stamp red">${st}</span>` : rare ? "Ít khi làm" : `${p.cansPerCarton} cái một thùng`, much: stockTotal(p) > 0 ? num(stockTotal(p)) : rare ? '<span class="none">—</span>' : '<span class="none">Hết</span>', muchSub: stockTotal(p) > 0 ? "thùng" : "", md: true, cls: st ? "alert" : rare ? "done" : "" }); }).join("")}</ul>
     ${t ? `<h2 class="sec" id="tec">Téc dầu · công ${esc(t.batch.code)} <small>nhập ${dm(t.batch.date)}</small></h2>
     <ul class="ledger">
       ${row({ what: "Còn", sub: `${num(t.leftKg)} kg dầu`, much: tanks(t.est), muchSub: "téc", cls: t.est <= 3 ? "alert" : "" })}
@@ -901,7 +901,7 @@
     const [paidM, nccPaid] = ncc ? monthPick((m) => sum(live(db.supplierPays).filter((p) => String(p.date).slice(0, 7) === m), (p) => p.amount)) : [month, 0];
     const head = band({
       title: "Sổ tiền",
-      totals: total("Khách còn nợ", short(debt), "#/tien") + total("Chưa về tay Mẹ", short(outTotal), "#/tien/thu"),
+      totals: total("Khách còn nợ", short(debt), "#/tien") + total("Chưa về tay Liên", short(outTotal), "#/tien/thu"),
     }) + `<div class="actions">${ncc
       ? (isOwner() ? `<a class="btn primary" href="#/tien/tra">${ICON.plus}Ghi trả nhà cung cấp</a>` : "")
       : `<a class="btn${tab === "thu" ? "" : " primary"}" href="#/tien/ghi">${ICON.plus}Ghi tiền khách trả</a>`}</div>
@@ -928,9 +928,9 @@
     // Tiền chưa rõ ai cầm lên trước, để hỏi cho ra người cầm
     out.sort((a, b) => (b.holder === "Chưa ghi") - (a.holder === "Chưa ghi"));
     const handed = db.payments.filter((p) => p.handed || p.void).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 20);
-    return head + `<h2 class="sec">Chưa về tay Mẹ</h2>
+    return head + `<h2 class="sec">Chưa về tay Liên</h2>
     ${out.length ? out.map((g) => `
-      <h3 class="grp"><span>${g.holder === "Chưa ghi" ? "Chưa rõ ai cầm" : `${esc(g.holder)} đang cầm`}<small>${g.items.length} khoản</small></span><b>${num(g.total)}</b></h3>
+      <h3 class="grp"><span>${g.holder === "Chưa ghi" ? "Chưa rõ ai cầm" : `${esc(nameOf(g.holder))} đang cầm`}<small>${g.items.length} khoản</small></span><b>${num(g.total)}</b></h3>
       ${g.holder === "Chưa ghi" && me() ? `<p class="note">${isOwner() ? "Chạm từng dòng để ghi ai đang cầm khoản&nbsp;đó." : "Bạn đang cầm khoản nào thì chạm vào để ghi&nbsp;lại."}</p>` : ""}
       <ul class="ledger">
         ${g.items.map((p) => { const act = isOwner() ? "recv" : g.holder === "Chưa ghi" && me() ? "claim" : "";
@@ -939,16 +939,16 @@
       ${!isOwner() ? "" : g.holder === "Chưa ghi"
         // Chưa biết ai cầm thì không xác nhận cả nhóm: hỏi từng khoản cho ra người cầm
         ? ""
-        : `<div class="actions"><button class="btn primary stacked" data-action="handover" data-holder="${esc(g.holder)}"><span>${ICON.check}${g.items.length > 1 ? `Mẹ đã nhận cả ${g.items.length} khoản` : "Mẹ đã nhận khoản này"}</span><b>${money(g.total)}</b></button></div>
+        : `<div class="actions"><button class="btn primary stacked" data-action="handover" data-holder="${esc(g.holder)}"><span>${ICON.check}${g.items.length > 1 ? `Liên đã nhận cả ${g.items.length} khoản` : "Liên đã nhận khoản này"}</span><b>${money(g.total)}</b></button></div>
       ${g.items.length > 1 ? `<p class="note">Chạm từng dòng để xác nhận riêng khoản đó.</p>` : ""}`}
-    `).join("") + (isOwner() ? "" : `<p class="info">${sync === "local" ? "Đưa tiền cho Mẹ xong, đưa máy cho Mẹ bấm “Mẹ đã nhận”." : "Đưa tiền cho Mẹ xong, Mẹ sẽ bấm “Mẹ đã nhận” trên điện thoại của Mẹ."}</p>`)
-      : `<p class="empty">Tiền khách trả đã về tay Mẹ hết. Không ai đang cầm hộ.</p>`}
-    <h2 class="sec">Đã về tay Mẹ <small>${handed.length >= 20 ? "20 lần gần nhất" : "gần đây"}</small></h2>
+    `).join("") + (isOwner() ? "" : `<p class="info">${sync === "local" ? "Đưa tiền cho Liên xong, đưa máy cho Liên bấm “Liên đã nhận”." : "Đưa tiền cho Liên xong, Liên sẽ bấm “Liên đã nhận” trên điện thoại của Liên."}</p>`)
+      : `<p class="empty">Tiền khách trả đã về tay Liên hết. Không ai đang cầm hộ.</p>`}
+    <h2 class="sec">Đã về tay Liên <small>${handed.length >= 20 ? "20 lần gần nhất" : "gần đây"}</small></h2>
     ${handed.length ? `<ul class="ledger">${handed.map((p) => row({
       href: `#/khach/${enc(cidOf(p))}`, what: esc(cname(cidOf(p))),
-      sub: `${dm(p.date)} · ${p.void ? '<span class="stamp grey">HỦY</span>' : p.holder === "Tài khoản Mẹ" ? `<span class="stamp pen${fr(p.id)}">TÀI KHOẢN MẸ</span>` : `<span class="nw"><span class="stamp${fr(p.id)}">ĐÃ NỘP MẸ</span> ${dm(p.handedDate)}</span>`}`,
+      sub: `${dm(p.date)} · ${p.void ? '<span class="stamp grey">HỦY</span>' : p.holder === "Tài khoản Mẹ" ? `<span class="stamp pen${fr(p.id)}">TÀI KHOẢN LIÊN</span>` : `<span class="nw"><span class="stamp${fr(p.id)}">ĐÃ NỘP LIÊN</span> ${dm(p.handedDate)}</span>`}`,
       much: num(p.amount), md: true, cls: p.void ? "void" : "",
-    })).join("")}</ul>` : `<p class="empty">Chưa có khoản nào về tay Mẹ.</p>`}`;
+    })).join("")}</ul>` : `<p class="empty">Chưa có khoản nào về tay Liên.</p>`}`;
   }
 
   // ---------- Trang: Một nhà cung cấp ----------
@@ -977,7 +977,7 @@
     if (name && fv(F, "supplier") === "") setDraft(F, "supplier", name);
     const cur = fv(F, "supplier", name || "");
     const s = suppliers().find((x) => x.key === skey(cur));
-    if (!isOwner()) return band({ title: "Ghi trả nhà cung cấp", back: "#/tien/ncc" }) + `<p class="empty">Chỉ Mẹ ghi được tiền trả nhà cung cấp.</p>`;
+    if (!isOwner()) return band({ title: "Ghi trả nhà cung cấp", back: "#/tien/ncc" }) + `<p class="empty">Chỉ Liên ghi được tiền trả nhà cung cấp.</p>`;
     return band({ title: "Ghi trả nhà cung cấp", back: name ? `#/ncc/${enc(name)}` : "#/tien/ncc" }) + `
     <form class="form" data-form="${F}" novalidate>
       <div class="field">
@@ -1013,7 +1013,7 @@
     return band({
       title: esc(c.name), back: "#/tien", exact: true,
       sub: [phone ? `<a href="tel:${esc(phone)}">${esc(phone)}</a>` : "", esc(c.info.address || "")].filter(Boolean).join(" · "),
-      totals: total("Còn nợ", c.debt > 0 ? num(c.debt) : "0", "#/khach/" + enc(id)) + total("Đã trả", num(c.paid), "#/khach/" + enc(id)),
+      totals: total(c.debt > 0 && oldestOwed(c) ? `Còn nợ · ${ageTag(oldestOwed(c))}` : "Còn nợ", c.debt > 0 ? num(c.debt) : "0", "#/khach/" + enc(id)) + total("Đã trả", num(c.paid), "#/khach/" + enc(id)),
     }) + `
     <div class="actions two">
       <a class="btn primary" href="#/tien/ghi/${enc(id)}">Ghi tiền trả</a>
@@ -1024,12 +1024,12 @@
     ${c.trips.length ? `<ul class="ledger">${[...c.trips].reverse().map((t) => row({
       href: billHref(id, t.date), what: `Chuyến ${dm(t.date)}`,
       sub: `${num(sum(t.orders, (o) => o.cartons))} thùng<br>${itemsText(t.orders)}`,
-      much: num(t.owed > 0 ? t.owed : t.amount), muchSub: t.owed > 0 ? `${t.owed < t.amount ? `còn nợ, trên ${num(t.amount)}` : "chưa trả"} · ${daysSince(t.date)} ngày` : t.unhanded ? '<span class="stamp pen">CHƯA VỀ MẸ</span>' : '<span class="stamp">ĐÃ TRẢ</span>', md: true,
+      much: num(t.owed > 0 ? t.owed : t.amount), muchSub: t.owed > 0 ? `${t.owed < t.amount ? `còn nợ, trên ${num(t.amount)}` : "chưa trả"} · ${ageTag(t.date)}` : t.unhanded ? '<span class="stamp pen">CHƯA VỀ LIÊN</span>' : '<span class="stamp">ĐÃ TRẢ</span>', md: true,
     })).join("")}</ul>` : `<p class="empty">Chưa giao chuyến nào cho khách này.</p>`}
     <h2 class="sec">Tiền đã trả</h2>
     ${c.pays.length ? `<ul class="ledger">${[...c.pays].reverse().map((p) => row({
       what: dm(p.date) + " · " + payWay(p.method),
-      sub: (p.alloc && p.alloc.length && !p.void ? `${allocText(p)}<br>` : "") + (p.void ? '<span class="stamp grey">HỦY</span>' : p.handed ? (p.holder === "Tài khoản Mẹ" ? `<span class="stamp pen${fr(p.id)}">TÀI KHOẢN MẸ</span>` : `<span class="stamp${fr(p.id)}">ĐÃ NỘP MẸ</span>`) : `<span class="stamp pen">${p.holder === "Chưa ghi" ? "CHƯA RÕ AI CẦM" : esc(p.holder.toUpperCase()) + " CẦM"}</span>`),
+      sub: (p.alloc && p.alloc.length && !p.void ? `${allocText(p)}<br>` : "") + (p.void ? '<span class="stamp grey">HỦY</span>' : p.handed ? (p.holder === "Tài khoản Mẹ" ? `<span class="stamp pen${fr(p.id)}">TÀI KHOẢN LIÊN</span>` : `<span class="stamp${fr(p.id)}">ĐÃ NỘP LIÊN</span>`) : `<span class="stamp pen">${p.holder === "Chưa ghi" ? "CHƯA RÕ AI CẦM" : esc(String(nameOf(p.holder)).toUpperCase()) + " CẦM"}</span>`),
       much: num(p.amount), md: true, cls: p.void ? "void" : "",
       action: isOwner() && !p.void ? `data-action="pay-menu" data-id="${p.id}"` : "",
     })).join("")}</ul>` : `<p class="empty">Khách này chưa trả lần nào.</p>`}
@@ -1065,30 +1065,42 @@
   function newPayDraft(id) {
     return { customer: id || "", q: "", amount: "", method: "", date: today(), dateOpen: false, error: "" };
   }
-  // Đã chọn khách thì thu lại thành một ô, chạm vào để chọn lại
-  const pickedCust = (c, action, note) => `<div class="picked one"><button type="button" data-action="${action}" data-v="" aria-label="Đổi khách, đang chọn ${esc(c.name)}">${esc(c.name)}<small>${note}</small></button></div>`;
-  // Ô tìm khách dùng chung cho Đơn hàng và Ghi tiền. Chưa gõ: khách mua gần đây lên trước, rồi mọi khách theo tên.
-  // Gõ rồi: tìm không cần dấu, không phân biệt hoa thường. Không có số tiền nào trong danh sách.
-  function custList(action, q) {
-    const key = plain(q), all = customerIds();
-    const list = (ids) => `<ul>${ids.map((k) => `<li><button type="button" class="cp-item" data-action="${action}" data-v="${esc(k)}">${esc(cname(k))}</button></li>`).join("")}</ul>`;
-    if (key) {
-      const hits = all.filter((k) => plain(cname(k)).includes(key));
-      return (hits.length ? list(hits) : `<p class="cp-none">Không có khách nào tên “${esc(q)}”.</p>`) + `<p class="sr-only" role="status">${hits.length} khách</p>`;
-    }
-    if (!all.length) return `<p class="cp-none">Chưa có khách nào.</p>`;
-    const recent = recentCustomers(5).filter((k) => all.includes(k));
-    return recent.length
-      ? `<p class="cp-head">Mua gần đây</p>${list(recent)}<p class="cp-head">Tất cả khách</p>${list(all.filter((k) => !recent.includes(k)))}`
-      : list(all);
+  // Đã chọn thì thu lại thành một ô, chạm vào để chọn lại
+  const pickedTile = (name, action, change, note) => `<div class="picked one"><button type="button" data-action="${action}" data-v="" aria-label="${change}, đang chọn ${esc(name)}">${esc(name)}<small>${note}</small></button></div>`;
+  // Ô tìm dùng chung cho khách, vật tư và nhà cung cấp: một danh sách theo vần, tìm không cần dấu.
+  const formQ = (F, field) => ({ q: () => fv(F, field + "Q"), setQ: (v) => setDraft(F, field + "Q", v) });
+  const custItems = () => customerIds().map((k) => ({ v: k, label: cname(k) }));
+  const byName = (a, b) => a.label.localeCompare(b.label, "vi");
+  const supplierItems = () => supplierNames().map((n) => ({ v: n, label: n }));
+  const PICKERS = {
+    "od-cust": { items: custItems, q: () => od.q, setQ: (v) => { od.q = v; }, kind: "khách", add: "cust-add" },
+    "pay-cust": { items: custItems, q: () => payDraft.q, setQ: (v) => { payDraft.q = v; }, kind: "khách", add: "cust-add" },
+    "vt-material": { items: () => db.materials.map((m) => ({ v: m.code, label: matName(m) })).sort(byName), ...formQ("vt", "material"), kind: "vật tư" },
+    "vt-supplier": { items: supplierItems, ...formQ("vt", "supplier"), kind: "nhà cung cấp", add: "vt-supplier", always: true },
+    "dau-supplier": { items: supplierItems, ...formQ("dau", "supplier"), kind: "nhà cung cấp", add: "dau-supplier", always: true },
+  };
+  function pickList(name, q) {
+    const P = PICKERS[name], key = plain(q), all = P.items();
+    const list = (items) => `<ul>${items.map((it) => `<li><button type="button" class="cp-item" data-action="${name}" data-v="${esc(it.v)}">${esc(it.label)}</button></li>`).join("")}</ul>`;
+    if (!key) return all.length ? list(all) : `<p class="cp-none">Chưa có ${P.kind} nào.</p>`;
+    // Khớp ở đầu tên lên trước, rồi đầu một từ, rồi giữa từ: "huong" ra Hương Chợ Mới, Đồ Thờ An Hương, rồi mới tới Phượng Xóm Trên
+    const atName = [], atWord = [], inside = [];
+    all.forEach((it) => { const n = plain(it.label); if (n.includes(key)) (n.startsWith(key) ? atName : ` ${n.replace(/[^a-z0-9]+/g, " ")}`.includes(` ${key}`) ? atWord : inside).push(it); });
+    const hits = [...atName, ...atWord, ...inside], typed = String(q).trim();
+    const wantAdd = P.add && (P.always ? !all.some((it) => plain(it.label) === key) : !hits.length);
+    const add = wantAdd ? `<button type="button" class="cp-add" data-action="${P.add}" data-v="${esc(typed)}">${ICON.plus}<span>Thêm${P.always ? "" : ` ${P.kind}`} “${esc(typed)}”</span></button>` : "";
+    return (hits.length ? list(hits) : add ? "" : `<p class="cp-none">Không có ${P.kind} nào tên “${esc(typed)}”.</p>`) + add + `<p class="sr-only" role="status">${hits.length} kết quả</p>`;
   }
   // Chọn rồi thì thu lại thành một ô; chưa chọn thì là ô tìm trên danh sách cuộn được
-  function custField(c, action, qId, q, lbl) {
-    if (c) return `<span class="label">${lbl}</span>${pickedCust(c, action, "đổi khách")}`;
-    return `<div class="label-row"><label for="${qId}">${lbl}</label><a href="#/khach-moi?ve=${enc(location.hash.slice(1))}">${ICON.plus}Khách mới</a></div>
-      <input class="input" id="${qId}" data-pick="${action}" type="search" enterkeyhint="search" autocomplete="off" placeholder="Tìm tên khách" value="${esc(q)}">
-      <div class="cp-list" id="${qId}-list">${custList(action, q)}</div>`;
+  function pickField(name, qId, lbl, picked, change, note, side = "") {
+    if (picked) return `<span class="label">${lbl}</span>${pickedTile(picked, name, change, note)}`;
+    const q = PICKERS[name].q();
+    return `${side ? `<div class="label-row"><label for="${qId}">${lbl}</label>${side}</div>` : `<label for="${qId}">${lbl}</label>`}
+      <input class="input" id="${qId}" data-pick="${name}" type="search" enterkeyhint="search" autocomplete="off" placeholder="Tìm ${PICKERS[name].kind}" value="${esc(q)}">
+      <div class="cp-list" id="${qId}-list">${pickList(name, q)}</div>`;
   }
+  const custField = (c, action, qId, lbl) => pickField(action, qId, lbl, c ? c.name : "", "Đổi khách", "đổi khách",
+    `<a href="#/khach-moi?ve=${enc(location.hash.slice(1))}">${ICON.plus}Khách mới</a>`);
   // Chọn khoản tiền trả cho chuyến nào; phần chưa chia thì tự trừ vào chuyến cũ nhất
   const allocSum = (a) => Object.values(a).reduce((x, n) => x + (n || 0), 0);
   const allocList = (a) => Object.entries(a).filter(([, n]) => n > 0).map(([date, amount]) => ({ date, amount }));
@@ -1121,7 +1133,7 @@
     const c = d.customer ? customer(d.customer) : null;
     return band({ title: "Ghi tiền khách trả", back: id ? `#/khach/${enc(id)}` : "#/tien" }) + `
     <form class="form" data-form="pay" novalidate>
-      <div class="field">${custField(c, "pay-cust", "pay-q", d.q, "1. Khách nào trả?")}</div>
+      <div class="field">${custField(c, "pay-cust", "pay-q", "1. Khách nào trả?")}</div>
       ${c ? `<div class="field">
         <label for="pay-amount">2. Trả bao nhiêu?</label>
         <input class="input money pay-amount" id="pay-amount" name="amount" inputmode="numeric" autocomplete="off" placeholder="0" value="${d.amount ? num(d.amount) : ""}">
@@ -1144,7 +1156,7 @@
   let chia = null;
   function viewChia(pid) {
     const p = db.payments.find((x) => x.id === pid);
-    if (!isOwner() || !p) return band({ title: "Chọn chuyến", back: "#/tien" }) + `<p class="empty">${p ? "Chỉ Mẹ chọn được chuyến cho khoản tiền." : "Không tìm thấy khoản tiền này."}</p>`;
+    if (!isOwner() || !p) return band({ title: "Chọn chuyến", back: "#/tien" }) + `<p class="empty">${p ? "Chỉ Liên chọn được chuyến cho khoản tiền." : "Không tìm thấy khoản tiền này."}</p>`;
     if (!chia || chia.id !== pid) chia = { id: pid, amount: p.amount, alloc: Object.fromEntries((p.alloc || []).map((a) => [a.date, a.amount])), error: "" };
     const trips = customer(cidOf(p), p.id).trips.filter((t) => t.owed > 0);
     return band({ title: "Khoản này trả cho chuyến nào?", sub: `${esc(cname(cidOf(p)))} · ${money(p.amount)} · ngày ${dm(p.date)}`, back: `#/khach/${enc(cidOf(p))}` }) + `
@@ -1159,7 +1171,6 @@
   // Luôn ba bước: loại → màu → số thùng. Nến không có màu thì đi thẳng tới bước 3.
   let sx = { step: 1, product: null, color: null, cartons: 0 };
   const swatch = (c, cls = "") => `<span class="swatch ${SWATCH[c]} ${cls}" aria-hidden="true"></span>`;
-  const sxHint = (p, n) => (n ? `Dùng khoảng ${num(n * kgPerCarton(p))} kg dầu, ${num(n * p.cansPerCarton)} can.` : `Mỗi thùng ${kgPerCarton(p).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} kg dầu, ${p.cansPerCarton} can.`);
   function viewSX() {
     const p = sx.product ? product(sx.product) : null;
     const needColor = p && p.group === "Dầu";
@@ -1184,14 +1195,13 @@
           <button type="button" class="choice" data-action="sx-day" data-v="h" aria-pressed="${sx.day !== "y"}">Hôm nay</button>
           <button type="button" class="choice" data-action="sx-day" data-v="y" aria-pressed="${sx.day === "y"}">Hôm qua</button>
         </div>
-        ${dup.length ? `<p class="info">${sx.day === "y" ? "Hôm qua" : "Hôm nay"} đã ghi ${num(sum(dup, (x) => x.cartons))} thùng loại này rồi${dup.some((x) => x.by) ? ` (${[...new Set(dup.map((x) => x.by).filter(Boolean))].map(esc).join(", ")})` : ""}.</p>` : ""}
+        ${dup.length ? `<p class="info">${sx.day === "y" ? "Hôm qua" : "Hôm nay"} đã ghi ${num(sum(dup, (x) => x.cartons))} thùng loại này rồi${dup.some((x) => x.by) ? ` (${[...new Set(dup.map((x) => nameOf(x.by)).filter(Boolean))].map(esc).join(", ")})` : ""}.</p>` : ""}
         <div class="stepper">
           <button type="button" data-action="sx-step" data-v="-1" aria-label="Bớt 1 thùng">${ICON.minus}</button>
           <input class="count-in" id="sx-n" inputmode="numeric" pattern="[0-9]*" autocomplete="off" aria-label="Số thùng" placeholder="0" value="${sx.cartons || ""}">
           <button type="button" data-action="sx-step" data-v="1" aria-label="Thêm 1 thùng">${ICON.plus}</button>
         </div>
         <div class="chips two">${[5, 10].map((n) => `<button type="button" class="chip" data-action="sx-step" data-v="${n}">+${n}</button>`).join("")}</div>
-        ${p.group === "Dầu" ? `<p class="hint" id="sx-hint" aria-live="polite">${sxHint(p, sx.cartons)}</p>` : ""}
         <div class="save-bar"><button class="btn primary block" id="sx-save" data-action="sx-save" ${sx.cartons ? "" : "disabled"}>${sx.day === "y" ? `Lưu cho hôm qua, ${dm(yday())}` : "Lưu"}</button></div>
       </div>`;
     }
@@ -1205,7 +1215,7 @@
     ${body}
     ${sx.step === 1 ? `<h2 class="sec">Hôm nay đã ghi</h2>
     ${todays.length ? `<ul class="ledger">${todays.map((x) => row({
-      what: esc(sxLabel(product(x.product), x.color)), sub: x.void ? '<span class="stamp grey">HỦY</span>' : `${esc(x.by)} ghi`,
+      what: esc(sxLabel(product(x.product), x.color)), sub: x.void ? '<span class="stamp grey">HỦY</span>' : `${esc(nameOf(x.by))} ghi`,
       much: x.cartons, muchSub: "thùng", md: true, cls: x.void ? "void" : "",
       action: !x.void && (isOwner() || x.by === me()) ? `data-action="sx-menu" data-id="${x.id}"` : "",
     })).join("")}</ul>` : `<p class="empty">Hôm nay chưa ghi gì.</p>`}
@@ -1237,7 +1247,7 @@
     };
   }
   function payNote(owed, value, unhanded, date) {
-    if (owed <= 0) return unhanded ? '<span class="stamp pen">CHƯA VỀ MẸ</span>' : '<span class="stamp">ĐÃ TRẢ</span>';
+    if (owed <= 0) return unhanded ? '<span class="stamp pen">CHƯA VỀ LIÊN</span>' : '<span class="stamp">ĐÃ TRẢ</span>';
     const age = date && daysSince(date) ? ` · ${daysSince(date)} ngày` : "";
     return `<span>${owed < value ? `còn nợ ${num(owed)}` : "chưa trả"}${age}</span>`;
   }
@@ -1316,7 +1326,7 @@
       if (!gone.length) return band({ title: "Hoá đơn", back: "#/don" }) + `<p class="empty">Không tìm thấy hoá đơn này.</p>`;
       const its = billItems(gone), dd = new Date(date + "T00:00:00");
       return band({ title: esc(cname(id)), sub: `Hoá đơn ${wdMid(dd)}, ${dmy(date)}`, back: "#/don" }) + `
-      <p class="note"><span class="stamp grey">HỦY</span> Hoá đơn này đã hủy${gone[0].voidBy ? ` (${esc(gone[0].voidBy)})` : ""}. Hàng đã được cộng lại vào kho, khách không nợ khoản này.</p>
+      <p class="note"><span class="stamp grey">HỦY</span> Hoá đơn này đã hủy${gone[0].voidBy ? ` (${esc(nameOf(gone[0].voidBy))})` : ""}. Hàng đã được cộng lại vào kho, khách không nợ khoản này.</p>
       <h2 class="sec">Hàng trong hoá đơn đã hủy</h2>
       <ul class="ledger">${its.map((it) => row({ what: esc(sxName(it.p)), sub: `<span class="counts">${colorCounts(it)}</span><br>${num(it.cartons)} thùng × ${num(it.price)}`, much: num(it.cartons * it.price), md: true, cls: "void" })).join("")}</ul>
       <div class="actions"><a class="btn" href="#/khach/${enc(id)}">Sổ của khách</a></div>`;
@@ -1325,7 +1335,7 @@
     const who = [...new Set(b.lines.map((o) => o.by).filter((x) => x && x !== "Excel"))];
     const phone = String((custById(id) || {}).phone || "").replace(/\D/g, "");
     const self = billHref(id, date);
-    const pay = b.owed <= 0 ? total(b.unhanded ? "Đã trả · chưa về tay Mẹ" : "Đã trả đủ", num(b.value), self)
+    const pay = b.owed <= 0 ? total(b.unhanded ? "Đã trả · chưa về tay Liên" : "Đã trả đủ", num(b.value), self)
       : total(`${b.owed < b.value ? "Còn nợ" : "Chưa trả"} · ${daysSince(date) ? daysSince(date) + " ngày" : "hôm nay"}`, num(b.owed), self);
     return band({
       title: esc(cname(id)), sub: `Hoá đơn ${wdMid(d)}, ${dmy(date)}`, back: "#/don", exact: true,
@@ -1338,7 +1348,7 @@
     <ul class="ledger sum">${row({ what: "Tổng cộng", sub: `${num(b.cartons)} thùng`, much: num(b.value) })}</ul>
     ${b.paidFrom.length ? `<h2 class="sec">Đã trả <small>các khoản khách trả đã trừ vào chuyến này</small></h2>
     <ul class="ledger">${b.paidFrom.map((f) => row({ what: `Tiền trả ngày ${dm(f.date)}`,
-      sub: f.handed ? (f.holder === "Tài khoản Mẹ" ? '<span class="stamp pen">TÀI KHOẢN MẸ</span>' : '<span class="stamp">ĐÃ NỘP MẸ</span>') : f.holder === "Chưa ghi" ? "chưa rõ ai cầm" : `${esc(f.holder)} đang cầm`,
+      sub: f.handed ? (f.holder === "Tài khoản Mẹ" ? '<span class="stamp pen">TÀI KHOẢN LIÊN</span>' : '<span class="stamp">ĐÃ NỘP LIÊN</span>') : f.holder === "Chưa ghi" ? "chưa rõ ai cầm" : `${esc(nameOf(f.holder))} đang cầm`,
       much: num(f.amount), md: true })).join("")}
       ${b.owed > 0 ? row({ what: "Còn nợ", much: num(b.owed), md: true }) : ""}</ul>` : ""}
     ${b.owed > 0 ? `<div class="actions"><a class="btn primary" href="#/tien/ghi/${enc(id)}">Ghi tiền trả</a></div>` : ""}
@@ -1346,7 +1356,7 @@
       <button class="btn" data-action="bill-copy" data-c="${esc(id)}" data-d="${date}" ${phone ? `data-phone="${phone}"` : ""}>${phone ? "Gửi Zalo" : "Chép gửi Zalo"}</button>
       <a class="btn" href="#/khach/${enc(id)}">Sổ của khách</a>
     </div>
-    ${who.length ? `<p class="note">Người ghi: ${who.map(esc).join(", ")}</p>` : ""}
+    ${who.length ? `<p class="note">Người ghi: ${who.map((x) => esc(nameOf(x))).join(", ")}</p>` : ""}
     ${isOwner() ? `<div class="actions"><button class="link" data-action="cancel-bill" data-c="${esc(id)}" data-d="${date}">Hủy hoá đơn này</button></div>` : ""}`;
   }
 
@@ -1422,7 +1432,7 @@
     return band({ title: "Lên đơn mới", back: id ? `#/khach/${enc(id)}` : "#/don" }) + `
     <form class="form order-form" data-form="order" novalidate>
       ${dateField("od-date", "date", "Ngày giao", od.date)}
-      <div class="field">${custField(c, "od-cust", "od-q", od.q, "Khách")}</div>
+      <div class="field">${custField(c, "od-cust", "od-q", "Khách")}</div>
       ${c && c.debt > 0 ? `<p class="info">${esc(c.name)} còn nợ <b>${money(c.debt)}</b>${owed.length ? ` từ chuyến ${dm(owed[0].date)}` : ""}. Nhớ hỏi tiền chuyến trước.</p>` : ""}
       <div class="field">
         <div class="label-row"><span class="label">Số thùng</span>${isOwner() ? `<button type="button" class="link" data-action="od-edit-price" aria-pressed="${od.editPrice}">${od.editPrice ? "Xong sửa giá" : "Sửa giá"}</button>` : ""}</div>
@@ -1438,7 +1448,6 @@
 
   // ---------- Trang: Nhập hàng (vật tư, dầu, hao hụt) ----------
   const voidAct = (col, rec) => (isOwner() || rec.by === me()) && !rec.void ? `data-action="void-menu" data-col="${col}" data-id="${rec.id}"` : "";
-  const supplierList = () => `<datalist id="ds-ncc">${supplierNames().map((n) => `<option value="${esc(n)}">`).join("")}</datalist>`;
   // Hàng trong kho để chọn khi ghi hao hụt
   const fpItems = () => db.products.filter((p) => !neverMade(p)).flatMap((p) => colorsOf(p).map((c) => ({ store: "Thành phẩm", code: p.code, color: c, name: label(p, c), unit: "thùng", system: stock(p.code, c) })));
   const nvlItems = () => db.materials.filter((m) => materialStatus(m) !== "CHƯA THEO DÕI").map((m) => ({ store: "NVL", code: m.code, color: "", name: matName(m), unit: m.unit, system: materialStock(m) }));
@@ -1453,16 +1462,10 @@
     const recent = [...db.purchases].sort((a, b) => (b.createdAt || b.date).localeCompare(a.createdAt || a.date)).slice(0, 10);
     return head + `
     <form class="form" data-form="${F}" novalidate>
-      <div class="field">
-        <label for="vt-m">Vật tư</label>
-        <select class="input" id="vt-m" name="material" data-rerender>
-          <option value="">— Chọn vật tư —</option>
-          ${db.materials.map((x) => `<option value="${x.code}" ${m && m.code === x.code ? "selected" : ""}>${esc(matName(x))}</option>`).join("")}
-        </select>
-      </div>
+      <div class="field">${pickField("vt-material", "vt-m", "Vật tư", m ? matName(m) : "", "Đổi vật tư", "đổi vật tư")}</div>
       <div class="field"><label for="vt-q">Số lượng${m ? ` (${esc(m.unit)})` : ""}</label>${qtyIn(F, "qty", "vt-q")}</div>
       <div class="field"><label for="vt-p">Giá mỗi ${m ? esc(m.unit) : "cái"} (đồng)</label>${moneyIn(F, "price", "vt-p", m ? matPrice(m.code) : "")}</div>
-      <div class="field"><label for="vt-s">Mua của ai?</label><input class="input" id="vt-s" name="supplier" list="ds-ncc" autocomplete="off" value="${esc(fv(F, "supplier"))}">${supplierList()}</div>
+      <div class="field">${pickField("vt-supplier", "vt-s", "Mua của ai?", String(fv(F, "supplier")).trim(), "Đổi nơi mua", "đổi nơi mua")}</div>
       <div class="field"><label for="vt-d">Ngày nhập</label>${dateIn(F, "date", "vt-d")}</div>
       ${errOf(F)}
       <button class="btn primary" type="submit">Lưu</button>
@@ -1482,7 +1485,7 @@
       <div class="field"><label for="dau-kg">Số kg dầu</label>${qtyIn(F, "kg", "dau-kg")}</div>
       <div class="field"><label for="dau-t">Đủ bao nhiêu téc?</label>${qtyIn(F, "tanks", "dau-t")}</div>
       <div class="field"><label for="dau-p">Giá mỗi kg (đồng)</label>${moneyIn(F, "price", "dau-p", last.pricePerKg || "")}</div>
-      <div class="field"><label for="dau-s">Mua của ai?</label><input class="input" id="dau-s" name="supplier" list="ds-ncc" autocomplete="off" value="${esc(fv(F, "supplier", last.supplier || ""))}">${supplierList()}</div>
+      <div class="field">${pickField("dau-supplier", "dau-s", "Mua của ai?", String(fv(F, "supplier", last.supplier || "")).trim(), "Đổi nơi mua", "đổi nơi mua")}</div>
       <div class="field"><label for="dau-d">Ngày nhập</label>${dateIn(F, "date", "dau-d")}</div>
       ${errOf(F)}
       <button class="btn primary" type="submit">Lưu</button>
@@ -1534,39 +1537,121 @@
   // ---------- Trang: Báo cáo (chỉ Mẹ) ----------
   const monthOf = (s) => s.slice(0, 7);
   const costOf = (o) => o.cartons * unitCost(product(o.product) || {}).total;
+  // Màu đi theo loại hàng, không theo thứ hạng. Mỗi loại: [ô màu, chữ số trên miếng màu sẫm]; miếng xếp theo thứ tự loại hàng quen thuộc.
+  const PIE = { "DAU-0.5": [1, 0], "DAU-0.6": [2, 1], "DAU-0.8": [3, 1], "DAU-1": [4, 1], "DAU-1.3": [5, 0], "DAU-1.5": [6, 0], "DAU-HS": [7, 1],
+    "DAU-1.1": [8, 1], "DAU-1.2": [9, 1], "DAU-1.4": [10, 0], "NEN-TL": [11, 0], "NEN-SH": [12, 1] };
+  let bc = { month: null, slice: null }, pieNow = [];
+  const bcMonth = () => bc.month || today().slice(0, 7);
+  const monthText = (m) => `${Number(m.slice(5))}/${m.slice(0, 4)}`;
+  // Các tháng có bán, mới nhất trước; tháng này luôn có để quay về
+  const bcMonths = () => [...new Set([today().slice(0, 7), ...soldOrders().map((o) => monthOf(soldDay(o)))])].sort().reverse();
+  function pieSlices(orders) {
+    const rows = db.products.map((p) => {
+      const os = orders.filter((o) => o.product === p.code);
+      return { code: p.code, name: sxName(p), rev: sum(os, orderValue), cartons: sum(os, (o) => o.cartons), tone: PIE[p.code] || [8, 1] };
+    }).filter((x) => x.rev > 0);
+    const all = sum(rows, (x) => x.rev);
+    let a = -Math.PI / 2;
+    return rows.map((x) => {
+      const share = x.rev / all, from = a, to = a + share * 2 * Math.PI - (share > 0.9995 ? 0.002 : 0);
+      a += share * 2 * Math.PI;
+      return { ...x, share, from, to, pct: share < 0.005 ? "<1" : String(Math.round(share * 100)) };
+    });
+  }
+  // Bánh nghiêng: mặt trên là hình elip, thành bánh chỉ thấy ở nửa phía trước, lõi xám lộ ra khi nhấc một miếng lên
+  const PIE_BOX = { w: 343, h: 236, cx: 171.5, cy: 106, rx: 150, ry: 84, depth: 28 };
+  function pieSvg(slices, active) {
+    const { w, h, cx, cy, rx, ry, depth } = PIE_BOX;
+    const pt = (t, dz = 0) => `${(cx + rx * Math.cos(t)).toFixed(1)} ${(cy + ry * Math.sin(t) + dz).toFixed(1)}`;
+    const arcTo = (t, big, sweep, dz = 0) => `A${rx} ${ry} 0 ${big ? 1 : 0} ${sweep} ${pt(t, dz)}`;
+    const wall = (a, b) => `M${pt(a)} ${arcTo(b, b - a > Math.PI, 1)} L${pt(b, depth)} ${arcTo(a, b - a > Math.PI, 0, depth)} Z`;
+    const cut = (t) => `M${cx} ${cy} L${pt(t)} L${pt(t, depth)} L${cx} ${cy + depth} Z`;
+    const piece = (x) => {
+      const mid = (x.from + x.to) / 2, f0 = Math.max(x.from, 0), f1 = Math.min(x.to, Math.PI), big = x.to - x.from > Math.PI;
+      const front = f1 > f0 ? wall(f0, f1) : "";
+      const lx = cx + rx * 0.62 * Math.cos(mid), ly = cy + ry * 0.62 * Math.sin(mid) + 5;
+      return `<g class="slice${x.code === active ? " on" : ""}" data-slice="${x.code}" style="--c:var(--pie-${x.tone[0]});--dx:${(Math.cos(mid) * 14).toFixed(1)}px;--dy:${(Math.sin(mid) * 10 - 9).toFixed(1)}px">
+        <path class="pie-cut" d="${cut(x.from)}"/><path class="pie-cut-shade pie-shade" d="${cut(x.from)}"/>
+        <path class="pie-cut" d="${cut(x.to)}"/><path class="pie-cut-shade pie-shade" d="${cut(x.to)}"/>
+        ${front ? `<path class="pie-wall" d="${front}"/><path class="pie-shade" d="${front}"/>` : ""}
+        <path class="pie-top" d="M${cx} ${cy} L${pt(x.from)} ${arcTo(x.to, big, 1)} Z"/>
+        ${x.share >= 0.06 ? `<text class="pie-pct${x.tone[1] ? " ink" : ""}" x="${lx.toFixed(1)}" y="${ly.toFixed(1)}">${x.pct}%</text>` : ""}
+      </g>`;
+    };
+    const order = [...slices.filter((x) => x.code !== active), ...slices.filter((x) => x.code === active)];
+    return `<svg viewBox="0 0 ${w} ${h}" aria-hidden="true" focusable="false">
+      <path class="pie-core-wall" d="${wall(0, Math.PI)}"/><ellipse class="pie-core" cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}"/>
+      <g class="pie-slices">${order.map(piece).join("")}</g>
+    </svg>`;
+  }
+  const pieDetail = (x) => (x
+    ? `<strong>${esc(x.name)}</strong><span class="pie-money">${money(x.rev)}</span><small>${x.pct}% doanh thu · ${num(x.cartons)} thùng</small>`
+    : '<span class="pie-hint">Chạm hoặc giữ một miếng để xem số.</span>');
+  // Nhấc miếng bánh tại chỗ, không vẽ lại cả trang
+  function pieSet(code) {
+    if (bc.slice === code) return;
+    bc.slice = code;
+    const holder = document.querySelector("#pie .pie-slices");
+    if (!holder) return;
+    holder.querySelectorAll(".slice.on").forEach((g) => g.classList.remove("on"));
+    if (code) {
+      const g = holder.querySelector(`[data-slice="${CSS.escape(code)}"]`);
+      if (g) { holder.appendChild(g); g.getBoundingClientRect(); g.classList.add("on"); }
+    }
+    const d = document.getElementById("pie-detail");
+    if (d) d.innerHTML = pieDetail(pieNow.find((x) => x.code === code));
+    document.querySelectorAll(".pie-key").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === code)));
+  }
+  function monthsSheet() {
+    const cur = bcMonth();
+    sheet(`<h2 id="sheet-title">Xem tháng nào?</h2>
+      ${bcMonths().map((m) => `<button class="btn block" data-action="bc-month" data-v="${m}" aria-pressed="${m === cur}">Tháng ${monthText(m)}</button>`).join("")}
+      <div class="sheet-links"><span></span><button class="link" data-action="sheet-no">Đóng</button></div>`);
+  }
+
   function viewBaoCao() {
-    if (!isOwner()) return band({ title: "Báo cáo", back: "#/" }) + `<p class="empty">Chỉ Mẹ xem được trang này.</p>`;
-    const sold = live(db.orders).filter((o) => o.status === "Đã giao");
-    const months = [...new Set(sold.map((o) => monthOf(o.deliver || o.date)))].sort().reverse().slice(0, 6);
-    const since = iso(new Date(Date.now() - 29 * 864e5));
-    const recent = sold.filter((o) => (o.deliver || o.date) >= since);
-    const byP = db.products.map((p) => {
-      const os = recent.filter((o) => o.product === p.code);
-      return { p, cartons: sum(os, (o) => o.cartons), rev: sum(os, orderValue), cost: sum(os, costOf) };
-    }).filter((x) => x.cartons).sort((a, b) => b.rev - a.rev);
-    const bs = batchesByDate(), oil = bs.length ? bs[bs.length - 1] : null;
-    // Tháng gần nhất có bán: lãi là con số Mẹ vào đây để xem
-    const lm = months[0], lmOs = lm ? sold.filter((o) => monthOf(o.deliver || o.date) === lm) : [];
-    const lmRev = sum(lmOs, orderValue), lmProfit = lmRev - sum(lmOs, costOf);
-    return band({ title: "Báo cáo", back: "#/", exact: true,
-      totals: lm ? total(`Lãi tháng ${Number(lm.slice(5))}`, num(Math.round(lmProfit / 1000) * 1000), "#/baocao") + total(`Bán tháng ${Number(lm.slice(5))}`, num(lmRev), "#/baocao") : "" }) + `
-    <h2 class="sec">Lãi theo tháng</h2>
-    ${months.length ? `<ul class="ledger">${months.map((m) => {
-      const os = sold.filter((o) => monthOf(o.deliver || o.date) === m);
-      const rev = sum(os, orderValue), profit = rev - sum(os, costOf);
-      return row({ what: `Tháng ${Number(m.slice(5))}/${m.slice(0, 4)}`, sub: `Bán ${num(rev)} · ${num(sum(os, (o) => o.cartons))} thùng`, much: num(Math.round(profit / 1000) * 1000), muchSub: "lãi", md: true });
-    }).join("")}</ul>` : `<p class="empty">Chưa bán được thùng nào.</p>`}
-    <h2 class="sec">Theo loại hàng <small>30 ngày qua</small></h2>
-    ${byP.length ? `<ul class="ledger">${byP.map((x) => row({ what: esc(sxName(x.p)), sub: `Bán ${num(x.rev)} · ${num(x.cartons)} thùng`, much: num(Math.round((x.rev - x.cost) / 1000) * 1000), muchSub: "lãi", md: true })).join("")}</ul>` : `<p class="empty">30 ngày qua chưa bán được thùng nào.</p>`}
+    if (!isOwner()) return band({ title: "Báo cáo", back: "#/" }) + `<p class="empty">Chỉ Liên xem được trang này.</p>`;
+    const m = bcMonth(), os = soldOrders().filter((o) => monthOf(soldDay(o)) === m);
+    const rev = sum(os, orderValue), profit = rev - sum(os, costOf);
+    pieNow = pieSlices(os);
+    if (!pieNow.some((x) => x.code === bc.slice)) bc.slice = null;
+    return band({ title: `Báo cáo tháng ${monthText(m)}`, back: "#/", exact: true,
+      side: `<button class="who icon" data-action="bc-months" aria-label="Chọn tháng khác, đang xem tháng ${monthText(m)}">${ICON.cal}</button>`,
+      totals: total("Doanh thu", rev ? num(rev) : NONE, "#/baocao") + total("Lợi nhuận", rev ? num(Math.round(profit / 1000) * 1000) : NONE, "#/baocao") }) + `
+    <h2 class="sec">Theo loại hàng</h2>
+    ${pieNow.length ? `<div class="pie-detail" id="pie-detail" aria-live="polite">${pieDetail(pieNow.find((x) => x.code === bc.slice))}</div>
+    <div id="pie">${pieSvg(pieNow, bc.slice)}</div>
+    <ul class="pie-legend">${pieNow.map((x) => `<li><button type="button" class="pie-key" data-action="bc-slice" data-v="${x.code}" aria-pressed="${x.code === bc.slice}" style="--c:var(--pie-${x.tone[0]})"><span class="pie-swatch" aria-hidden="true"></span><span>${esc(x.name)}</span><b>${num(x.rev)}</b></button></li>`).join("")}</ul>`
+      : `<p class="empty">Tháng ${monthText(m)} chưa bán thùng nào. Chạm vào hình lịch ở góc trên để xem tháng khác.</p>`}
     <h2 class="sec">Lãi mỗi thùng <small>giá bán trừ giá vốn</small></h2>
     <ul class="ledger">${db.products.filter((p) => !neverMade(p)).map((p) => {
-      const c = unitCost(p), m = p.price - c.total;
+      const c = unitCost(p), mg = p.price - c.total;
       const r = (n) => Math.round(n / 100) * 100;
       return row({ what: esc(sxName(p)), sub: c.hasBom ? `Vốn ${num(r(c.total))} · bán ${num(p.price)}` : "Chưa có định mức vật tư",
-        much: c.hasBom ? num(r(m)) : "—", muchSub: c.hasBom && p.price ? `${Math.round((m / p.price) * 100)}%` : "", md: true });
-    }).join("")}</ul>
-    ${oil ? `<p class="note">Giá vốn tính theo giá dầu công ${esc(oil.code)} (${num(oil.pricePerKg)} ₫/kg) và giá vật tư lần nhập gần nhất.</p>` : ""}`;
+        much: c.hasBom ? num(r(mg)) : "—", muchSub: c.hasBom && p.price ? `${Math.round((mg / p.price) * 100)}%` : "", md: true });
+    }).join("")}</ul>`;
   }
+
+  // Bánh: nhấn xuống là nhấc miếng lên, buông ra vẫn giữ để đọc số; chạm lại miếng đó hoặc chỗ trống thì đặt xuống.
+  // Đang vuốt cuộn trang thì máy huỷ lần nhấn: trả về như trước.
+  let piePress = null;
+  document.addEventListener("pointerdown", (e) => {
+    if (!e.target.closest || !e.target.closest("#pie")) return;
+    const g = e.target.closest("[data-slice]"), code = g ? g.dataset.slice : null;
+    piePress = { was: bc.slice, code };
+    if (code && code !== bc.slice) pieSet(code);
+  });
+  document.addEventListener("pointerup", () => {
+    if (!piePress) return;
+    const p = piePress; piePress = null;
+    if (!p.code || p.code === p.was) pieSet(null);
+  });
+  document.addEventListener("pointercancel", () => {
+    if (!piePress) return;
+    const p = piePress; piePress = null;
+    pieSet(p.was);
+  });
+  document.addEventListener("contextmenu", (e) => { if (e.target.closest && e.target.closest("#pie")) e.preventDefault(); });
 
   // ---------- Bảng chọn người / xác nhận ----------
   let sheetReturn = null, focusAfter = null, walk = null;
@@ -1607,14 +1692,14 @@
     const all = p.method === "CK" ? CK_HOLDERS : p.method === "TM" ? PEOPLE : [...PEOPLE, "Tài khoản Mẹ"];
     const opts = unk ? all : all.filter((h) => !WITH_OWNER.includes(h) && (h !== p.holder || OTHER.includes(h)));
     const pick = (h) => WITH_OWNER.includes(h)
-      ? `<button class="btn" data-action="recv-yes" data-id="${p.id}" data-v="${esc(h)}">${h === OWNER ? "Mẹ đã nhận" : "Tài khoản Mẹ"}</button>`
+      ? `<button class="btn" data-action="recv-yes" data-id="${p.id}" data-v="${esc(h)}">${h === OWNER ? "Liên đã nhận" : "Tài khoản Liên"}</button>`
       : OTHER.includes(h) ? `<button class="btn" data-action="recv-other" data-id="${p.id}" data-v="${esc(h)}">${h === "Người khác" ? "Người khác…" : "Tài khoản khác…"}</button>`
-      : `<button class="btn" data-action="recv-holder" data-id="${p.id}" data-v="${esc(h)}">${esc(h)}</button>`;
+      : `<button class="btn" data-action="recv-holder" data-id="${p.id}" data-v="${esc(h)}">${esc(nameOf(h))}</button>`;
     const multi = walk && walk.total > 1;
     sheet(`<h2 id="sheet-title">${esc(cname(cidOf(p)))} · ${money(p.amount)}</h2>
       ${walk && walk.last ? `<p class="just">${esc(walk.last.msg)} <button class="link" data-action="walk-undo">Ghi nhầm</button></p>` : ""}
-      <p>${multi ? `Khoản ${walk.done + 1}/${walk.total} · ` : ""}Ngày ${dm(p.date)} · ${payWay(p.method)}${unk ? "" : ` · ${esc(p.holder)} đang cầm`}.</p>
-      ${unk ? "" : `<button class="btn block primary" data-action="recv-yes" data-id="${p.id}">${ICON.check}Mẹ đã nhận khoản này</button>`}
+      <p>${multi ? `Khoản ${walk.done + 1}/${walk.total} · ` : ""}Ngày ${dm(p.date)} · ${payWay(p.method)}${unk ? "" : ` · ${esc(nameOf(p.holder))} đang cầm`}.</p>
+      ${unk ? "" : `<button class="btn block primary" data-action="recv-yes" data-id="${p.id}">${ICON.check}Liên đã nhận khoản này</button>`}
       ${opts.length ? `<p class="ask" id="recv-ask">${unk ? "Ai đang cầm khoản này?" : "Hoặc ghi lại người đang cầm"}</p>
       <div class="choices two" role="group" aria-labelledby="recv-ask">${opts.map(pick).join("")}</div>` : ""}
       <div class="sheet-links"><button class="link" data-action="go-close" data-v="#/khach/${enc(cidOf(p))}">Xem sổ của khách</button>
@@ -1640,15 +1725,15 @@
         ${SIZES.map((s, i) => `<button type="button" class="choice" data-action="set-size" data-v="${i}" aria-pressed="${(db.meta.textSize || 0) === i}">${s.label}</button>`).join("")}
       </div>`;
     if (canShare) {
-      sheet(`<h2 id="sheet-title">${esc(who.name)}</h2>
-        <p>${isOwner() ? "Máy này đang dùng tài khoản của Mẹ, nên có đủ quyền của Mẹ." : "App sẽ nhớ ai đã ghi từng dòng."}</p>
+      sheet(`<h2 id="sheet-title">${esc(nameOf(who.name))}</h2>
+        <p>${isOwner() ? "Máy này đang dùng tài khoản của Liên, nên có đủ quyền của Liên." : "App sẽ nhớ ai đã ghi từng dòng."}</p>
         ${sizes}
         <button class="btn block" data-action="sign-out">Đăng xuất</button>
         <div class="sheet-links"><span></span><button class="link" data-action="sheet-no">Đóng</button></div>`);
       return;
     }
     sheet(`<h2 id="sheet-title">Ai đang dùng máy này?</h2><p>App sẽ nhớ ai đã ghi từng dòng.</p>
-      ${people().map((p) => `<button class="btn block ${p === me() ? "primary" : ""}" data-action="set-user" data-v="${esc(p)}" aria-pressed="${p === me()}">${esc(p)}</button>`).join("")}
+      ${people().map((p) => `<button class="btn block ${p === me() ? "primary" : ""}" data-action="set-user" data-v="${esc(p)}" aria-pressed="${p === me()}">${esc(nameOf(p))}</button>`).join("")}
       ${sizes}`);
   }
   function confirmSheet(title, text, yesLabel, onYes, _danger, noLabel = "Thôi, không làm") {
@@ -1748,6 +1833,8 @@
       if (!path.startsWith("tien/ghi") && !side) payDraft = null;
       if (!path.startsWith("don/moi") && !side) od = null;
       if (!path.startsWith("tien/tra")) delete drafts.tra;
+      if (!side) delete drafts.khach;
+      if (!path.startsWith("baocao")) bc = { month: null, slice: null };
       if (!path.startsWith("sx")) sx = { step: 1, product: null, color: null, cartons: 0 };
       lastPath = path;
       render();
@@ -1775,8 +1862,8 @@
     }
     // Tìm khách: chỉ vẽ lại danh sách, ô tìm giữ nguyên
     if (t.dataset.pick) {
-      (t.dataset.pick === "od-cust" ? od : payDraft).q = t.value;
-      const l = document.getElementById(t.id + "-list"); if (l) { l.innerHTML = custList(t.dataset.pick, t.value); l.scrollTop = 0; }
+      PICKERS[t.dataset.pick].setQ(t.value);
+      const l = document.getElementById(t.id + "-list"); if (l) { l.innerHTML = pickList(t.dataset.pick, t.value); l.scrollTop = 0; }
     }
     if (t.id === "pay-amount" || t.dataset.price || t.hasAttribute("data-money")) {
       const n = parseMoney(t.value);
@@ -1804,7 +1891,6 @@
       const n = Math.min(9999, parseMoney(t.value));
       sx.cartons = n;
       if (String(n || "") !== t.value) t.value = n || "";
-      const h = document.getElementById("sx-hint"); if (h) h.textContent = sxHint(product(sx.product), n);
       const b = document.getElementById("sx-save"); if (b) b.disabled = !n;
     }
     // Tìm đơn theo tên khách: chỉ vẽ lại danh sách, ô tìm giữ nguyên
@@ -1972,7 +2058,7 @@
     if (el.dataset.action === "sx-save" && blocked(true)) return;
     switch (el.dataset.action) {
       case "who": whoSheet(); break;
-      case "set-user": db.meta.user = v; save(); closeSheet(); render(); toast(`Xin chào ${v}.`); break;
+      case "set-user": db.meta.user = v; save(); closeSheet(); render(); toast(`Xin chào ${nameOf(v)}.`); break;
       case "set-size": db.meta.textSize = Number(v); save(); applySize(); whoSheet(); render(); break;
       case "sign-out": doSignOut(); break;
       case "retry-profile": if (pendingUser) onUser(pendingUser); break;
@@ -2007,10 +2093,10 @@
         const items = live(db.payments).filter((p) => !p.handed && p.holder === el.dataset.holder);
         const amt = sum(items, (p) => p.amount);
         const from = el.dataset.holder === "Chưa ghi" ? "các khoản chưa rõ ai cầm" : el.dataset.holder;
-        confirmSheet("Mẹ đã nhận tiền?", `Xác nhận Mẹ đã nhận đủ <b>${money(amt)}</b> từ ${esc(from)}.`, "Đúng, Mẹ đã nhận đủ", () => {
+        confirmSheet("Liên đã nhận tiền?", `Xác nhận Liên đã nhận đủ <b>${money(amt)}</b> từ ${esc(nameOf(from))}.`, "Đúng, Liên đã nhận đủ", () => {
           const day = today();
           items.forEach((p) => { p.handed = true; p.handedDate = day; p.handedBy = me(); fresh.add(p.id); });
-          setTimeout(() => toast(`Mẹ đã nhận ${money(amt)}.`, () => items.forEach((p) => { p.handed = false; p.handedDate = null; }), true), 0);
+          setTimeout(() => toast(`Liên đã nhận ${money(amt)}.`, () => items.forEach((p) => { p.handed = false; p.handedDate = null; }), true), 0);
         }, false, "Chưa nhận");
         break;
       }
@@ -2039,7 +2125,7 @@
         const p = db.payments.find((x) => x.id === id); if (!p) break;
         const was = p.holder; if (v) p.holder = v;
         p.handed = true; p.handedDate = today(); p.handedBy = me(); fresh.add(p.id);
-        stepOn(`Mẹ đã nhận ${money(p.amount)} của ${cname(cidOf(p))}.`, () => { p.handed = false; p.handedDate = null; p.holder = was; });
+        stepOn(`Liên đã nhận ${money(p.amount)} của ${cname(cidOf(p))}.`, () => { p.handed = false; p.handedDate = null; p.holder = was; });
         break;
       }
       // Người khác nhận là mình đang cầm một khoản chưa rõ ai cầm; chỉ Mẹ mới bấm đã nhận
@@ -2056,7 +2142,7 @@
         const p = db.payments.find((x) => x.id === id); if (!p || p.holder !== "Chưa ghi" || !me()) break;
         if (!canShare && me() === "Người khác") { otherSheet(p, "Người khác"); break; }
         p.holder = me();
-        stepOn(`Đã ghi ${me()} đang cầm ${money(p.amount)}.`, () => { p.holder = "Chưa ghi"; });
+        stepOn(`Đã ghi ${nameOf(me())} đang cầm ${money(p.amount)}.`, () => { p.holder = "Chưa ghi"; });
         break;
       }
       // "Người khác" chưa nói được tiền ở đâu: hỏi cho ra tên
@@ -2076,7 +2162,7 @@
       case "recv-holder": {
         const p = db.payments.find((x) => x.id === id); if (!p) break;
         const was = p.holder; p.holder = v;
-        stepOn(`Đã ghi ${v} đang cầm ${money(p.amount)}.`, () => { p.holder = was; });
+        stepOn(`Đã ghi ${nameOf(v)} đang cầm ${money(p.amount)}.`, () => { p.holder = was; });
         break;
       }
       case "pay-menu": {
@@ -2170,6 +2256,18 @@
         if (v) focusAfter = ".picked button";
         render();
         break;
+      case "bc-months": monthsSheet(); break;
+      case "bc-month": bc.month = v; bc.slice = null; closeSheet(); render(); break;
+      case "bc-slice": pieSet(bc.slice === v ? null : v); break;
+      case "cust-add": setDraft("khach", "name", v); location.hash = `#/khach-moi?ve=${enc(location.hash.slice(1))}`; break;
+      case "vt-material": case "vt-supplier": case "dau-supplier": {
+        const [F, field] = el.dataset.action === "vt-material" ? ["vt", "material"] : [el.dataset.action.slice(0, -9), "supplier"];
+        setDraft(F, field, v); setDraft(F, field + "Q", "");
+        if (field === "material") delete drafts.vt.price;
+        if (v) focusAfter = `.picked [data-action="${el.dataset.action}"]`;
+        render();
+        break;
+      }
       case "od-edit-price": od.editPrice = !od.editPrice; render(); break;
 
       case "export": {

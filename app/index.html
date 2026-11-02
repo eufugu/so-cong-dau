@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sổ công dầu</title>
+<meta name="description" content="Sổ chung của cả nhà: kho dầu, tiền khách nợ, sản xuất hằng ngày.">
+<meta name="theme-color" content="#eef0fb">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Sổ công dầu">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+  <main id="main" tabindex="-1"></main>
+  <nav class="tabs" aria-label="Các trang chính">
+    <ul>
+      <li><a href="#/" data-tab="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M10 21v-6h4v6"/></svg>Hôm nay</a></li>
+      <li><a href="#/tien" data-tab="tien"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h12a3 3 0 0 1 3 3v14H7a3 3 0 0 1-3-3Z"/><path d="M8 4v17"/><path d="M11 9h5M11 13h5"/></svg>Sổ tiền</a></li>
+      <li><a href="#/sx" data-tab="sx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="14" rx="1.5"/><path d="M3 11h18"/><path d="M12 7V3M9 5l3-2 3 2"/></svg>Sản xuất</a></li>
+      <li><a href="#/don" data-tab="don"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>Đơn hàng</a></li>
+      <li><a href="#/kho" data-tab="kho"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9 12 4l9 5v11H3Z"/><path d="M7 20v-7h10v7"/><path d="M7 16.5h10"/></svg>Kho hàng</a></li>
+    </ul>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"><span id="toast-msg"></span><button type="button" id="toast-undo">Ghi nhầm</button></div>
+<script src="seed.js"></script>
+<script src="lunar.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

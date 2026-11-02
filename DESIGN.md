@@ -95,7 +95,7 @@ spacing:
   lg: "12px"
   gutter: "16px"
   section: "28px"
-  tap: "52px"
+  tap: "56px"
 components:
   button-primary:
     backgroundColor: "{colors.pen}"
@@ -111,14 +111,6 @@ components:
     rounded: "{rounded.r}"
     padding: "0 18px"
     height: "{spacing.tap}"
-  button-danger:
-    backgroundColor: "{colors.paper}"
-    textColor: "{colors.red}"
-    rounded: "{rounded.r}"
-    padding: "0 18px"
-    height: "{spacing.tap}"
-  button-big:
-    height: "64px"
   input:
     backgroundColor: "{colors.paper}"
     textColor: "{colors.ink}"
@@ -136,23 +128,23 @@ components:
     textColor: "{colors.ink}"
     rounded: "{rounded.r}"
     padding: "8px 10px"
-    height: "60px"
+    height: "{spacing.tap}"
   choice-selected:
-    backgroundColor: "{colors.pen-soft}"
-    textColor: "{colors.pen}"
+    backgroundColor: "{colors.pen}"
+    textColor: "{colors.paper}"
   chip:
     backgroundColor: "{colors.paper}"
     textColor: "{colors.ink}"
-    rounded: "{rounded.pill}"
-    padding: "0 16px"
-    height: "48px"
+    rounded: "{rounded.r}"
+    padding: "0 18px"
+    height: "{spacing.tap}"
   segment:
     backgroundColor: "{colors.paper}"
     textColor: "{colors.ink-2}"
-    height: "52px"
+    height: "{spacing.tap}"
   segment-selected:
-    backgroundColor: "{colors.pen-soft}"
-    textColor: "{colors.pen}"
+    backgroundColor: "{colors.pen}"
+    textColor: "{colors.paper}"
   total-card:
     backgroundColor: "{colors.paper}"
     textColor: "{colors.pen}"
@@ -179,7 +171,7 @@ components:
     typography: "{typography.tab-label}"
     height: "64px"
   tab-active:
-    textColor: "{colors.red}"
+    textColor: "{colors.pen}"
   empty-state:
     backgroundColor: "{colors.band}"
     textColor: "{colors.ink-2}"
@@ -212,7 +204,7 @@ components:
 
 **Creative North Star: "The Family Credit Notebook"**
 
-The app is the vở ô ly the family already keeps: a white page, a lilac-blue grid printed only at the top of the sheet, one red margin rule running down every list, labels written in near-black ink and every figure in ballpoint blue. It is the same notebook, made exact and shared. Every list puts *who or what* on the left of the red rule and *how much* on the right, so the eye learns one path through every screen.
+The app is the vở ô ly the family already keeps: a white page, a lilac-blue grid printed only at the top of the sheet, one faint rule running down every list, labels written in near-black ink and every figure in ballpoint blue. It is the same notebook, made exact and shared. Every list puts *who or what* on the left of the rule and *how much* on the right, so the eye learns one path through every screen.
 
 Density is low and type is large on purpose. The root size is 112.5% (18px). A text-size setting raises it to 125% or 140%, and every value is in rem so the whole page scales together. Tap targets start at 48px and most controls sit at 52px, 60px, 64px or 72px. The surface is flat paper. Depth comes from rules, borders and tint. The only shadows are on the two things that float: the undo toast and the bottom sheet's scrim.
 
@@ -220,11 +212,11 @@ Status is written on, never removed. Payment and stock states are rubber stamps:
 
 **Key Characteristics:**
 - White paper, with the ô ly grid pattern only in the header band
-- One red margin rule (2px, 85% opacity) dividing label from figure on every ledger list
+- One faint ruled line (1px, the Ruled Line colour) dividing label from figure on every ledger list
 - Figures in pen blue, tabular numerals, right-aligned and large
 - Rotated rubber stamps for every state. Cancelled items are struck through, never deleted
 - Flat surfaces, 2px borders, 10px corners, 48px+ targets
-- Scales as a whole from the root size (112.5% / 125% / 140%). Figures take their full rem size; a figure that would not fit its half of the page (right of the margin rule, or a total card) is shrunk one pixel at a time until it fits, so short numbers grow with the text setting and long ones stay whole
+- Scales as a whole from the root size (112.5% / 125% / 140%). Figures take their full rem size; a figure that would not fit its half of the page (right of the ruled line, or a total card) is shrunk one pixel at a time until it fits, so short numbers grow with the text setting and long ones stay whole
 
 ## Colors
 
@@ -233,11 +225,11 @@ A paper-and-ink palette: white page, lilac-blue printed grid, ballpoint blue for
 ### Primary
 - **Ballpoint Blue** (pen): every figure, the money input, the primary button fill, outline-button borders and text, the selected tab bar and choices, links, and the focus outline. It is the colour of something counted.
 - **Pressed Ballpoint** (pen-deep): the primary button's pressed state only.
-- **Blotter Blue** (pen-soft): the fill for a selected choice, pressed rows and info notes, and the halo around a focused input.
+- **Blotter Blue** (pen-soft): pressed rows, info notes, filled order cells, and the halo around a focused input. Never a selected state.
 - **Deep Blue Ink** (info-ink): text inside info notes.
 
 ### Secondary
-- **Margin Red** (red): the ledger margin rule, the active tab label and its notch, alert figures (debt, low stock, few tanks left), zero-stock cells, red stamps, danger-button text and border, and the stale or read-only sync dot. Red marks structure or alarm, nothing else.
+- **Alarm Red** (red): only through the alert and stamp classes: out of stock, materials to order, few tanks left, an order past stock, and a lost connection. Overdue debt belongs here too, once the app has an overdue rule.
 - **Red Blot** (red-soft) with **Dried Red Ink** (warn-ink) text and **Red Blot Edge** (warn-edge) border: warning notes.
 
 ### Tertiary
@@ -259,9 +251,9 @@ Product swatches (#c8102e Đỏ, #f2c230 Vàng, #fff Trắng) are content colour
 ### Named Rules
 **The Blue Means Number Rule.** Ballpoint blue is for figures and the controls that produce them. It is never decoration.
 
-**The Red Pen Rule.** Red appears only as the margin rule, the active tab, or an alarm (debt, low or zero stock, a danger action, a lost connection).
+**The Red Pen Rule.** Red means out of stock, overdue or a sync error, and nothing else. Ordinary debt, money not yet with Mẹ, negative profit, the active tab and destructive actions are never red. Error notices (`.warn`) keep their red tint.
 
-**The Calm Home Rule.** Hôm nay is the screen Mẹ opens every day, so it is quieter than the ledger pages. Red on a figure means something needs action today: materials to order, few tanks left, a production log not yet written. Debt, money not yet with Mẹ and profit (even negative) are ballpoint blue there. Overdue debt would be red too, but the app has no overdue rule yet. The margin rule drops to 35% opacity, and figures to weight 600.
+**The Calm Home Rule.** Hôm nay is the screen Mẹ opens every day, so its figures drop to weight 600.
 
 **The Printed Grid Rule.** The 22px ô ly grid pattern appears only in the header band. Empty states and table headers get the flat tint. Data never sits on the grid pattern.
 
@@ -296,7 +288,7 @@ Units after a figure (thùng, téc, ₫) are set at 0.6–0.7em, weight 600.
 
 A single phone column, max-width 560px, centred. The tab bar and sheet use the same width. The horizontal gutter is 16px everywhere: section headings, notes, notices, actions, forms and the table wrapper. Sections open with 28px above the heading and 8px below it. Gaps between controls step through 6, 8, 10 and 12px. Forms stack fields 18px apart.
 
-The ledger is the main layout primitive: a two-column grid with the split at `--m` (50%, the red rule in the middle of the row). The first column holds the label, padded 12px 14px 12px 16px. The second holds the right-aligned figure plus a chevron when the row is tappable. Rows are at least 72px tall and divided by 1px ruled lines.
+The ledger is the main layout primitive: a two-column grid with the split at `--m` (50%, the ruled line in the middle of the row). The first column holds the label, padded 12px 14px 12px 16px. The second holds the right-aligned figure plus a chevron when the row is tappable. Rows are at least 72px tall and divided by 1px ruled lines.
 
 Choice grids use auto-fill at minmax(140px, 1fr), or fixed 2 or 3 columns. Paired actions use a 1fr 1fr grid. The stepper is 72px | 1fr | 72px.
 
@@ -315,7 +307,7 @@ The page is flat paper. Depth comes from tint (band, blotter, red blot), 2px bor
 
 ## Shapes
 
-Gently rounded rectangles (10px) for every control, card, notice, table wrapper and the toast. Stamps are nearly square (4px) and tilted -3deg. Chips, the person button and the "picked" summary chips are full pills (999px). The bottom sheet rounds only its top corners (16px 16px 0 0). Progress steps are 6px bars with 3px ends. The active-tab notch is a 4px red bar hanging from the tab bar's top border, with rounded bottom corners (0 0 3px 3px).
+Gently rounded rectangles (10px) for every control, card, notice, table wrapper and the toast. Stamps are nearly square (4px) and tilted -3deg. The bottom sheet rounds only its top corners (16px 16px 0 0). Progress steps are 6px bars with 3px ends. The active-tab notch is a 4px pen bar hanging from the tab bar's top border, with rounded bottom corners (0 0 3px 3px).
 
 Interactive borders are 2px. Rules and dividers are 1px, except the band's bottom border and the tab bar's top border, which are 2px grid. Empty states use a 2px dashed grid border.
 
@@ -323,27 +315,28 @@ Interactive borders are 2px. Rules and dividers are 1px, except the band's botto
 
 ### Buttons
 Firm and plain: outlined pen-blue on paper, filled only for the main action.
-- **Shape:** gently rounded (10px), 2px border, minimum 52px tall, padding 0 18px, 700 weight, 22px inline SVG icon with 8px gap.
+- **Shape:** one size everywhere: gently rounded (10px), 2px border, minimum 56px tall (`--tap`), padding 0 18px, 1.05rem / 700, 22px inline SVG icon with 8px gap. `.block` makes a button full width.
 - **Primary:** pen-blue fill, white text. Pressed: pen-deep.
 - **Outline (default):** paper fill, pen-blue border and text.
-- **Danger:** paper fill, red border and text (Hủy đơn, destructive confirms).
-- **Big:** 64px tall, 1.15rem text. Used for the full-width "Ghi sản xuất hôm nay" and "Lên đơn mới" and for sheet actions. `.block` makes a button full width.
+- **Exactly two styles and one link.** Primary (filled) and secondary (outline). Text links are pen blue, 600, underlined and 48px tall. Destructive actions use these same styles; a confirm sheet protects them.
+- **Disabled:** solid grid-soft fill, control-edge border, pencil text.
 - **Disabled:** solid grid-soft fill, control-edge border, pencil text, not-allowed cursor (no fading, so the label stays readable).
-- **Stacked (money confirm):** a Big primary with two lines: the action with its check icon, then the amount at min(1.6rem, 7vw) / 700. Min 84px tall. Used for "Mẹ đã nhận…"; it is always the strongest button on its screen. Never on Hôm nay, where money is a plain row.
+- **Stacked (money confirm):** a primary with two lines, so it grows taller than one line: the action with its check icon, then the amount at min(1.6rem, 7vw) / 700. Min 84px tall. Used for "Mẹ đã nhận…"; it is always the strongest button on its screen. Never on Hôm nay, where money is a plain row.
 - **Money format rule.** Short form (57tr, 24,2tr) only in the two band total cards. Every list row, sheet and button shows the exact amount (28.200.000), rounded to the thousand only for profit. Ledger and card figures carry no ₫; buttons, sheets and toasts add " ₫". Never show the same amount twice on one screen: when Mẹ's money row carries "Chưa về tay Mẹ", her second card shows "Đã về tay Mẹ tháng N" instead.
 - **One main button per screen.** On Hôm nay it is "Ghi sản xuất" for everyone: under the list for Mẹ, above it ("Ghi sản xuất hôm nay") for others. Mẹ's money question or confirm is the first row of the list, at regular weight (`.row.plain`).
 - **Focus:** the global 3px pen-blue outline with a 2px offset.
 
 ### Chips
-- **Style:** 48px pill, paper fill, 2px control-edge border, 0.9rem / 600. Used as quick-fill actions (+5, +10, Trả hết nợ…). Picked-summary chips use the band tint.
+- **Style:** a chip is a secondary button (+5, +10, Trả hết…), same height, radius and colours.
 - **State:** action only. Chips have no selected state; selection belongs to Choices.
 
 ### Choices and Segmented Control
-- **Choice:** a 60px tile, 2px control-edge border, 10px radius, centred 600 label with an optional 0.85rem sub-line. Selected (`aria-pressed`): pen border, blotter fill, pen text, plus a 1px inner pen outline at -3px. Used for product, colour (with a written swatch name), holder, method and text size.
-- **Segmented (screen tabs):** tabs sitting on a 2px grid rule, placed directly above the list they switch and below the screen's primary button. Tabs are 52px with no fill, 0.9rem / 600 pencil text. The selected tab has a blotter fill with 10px top corners, 700 pen text and a 4px pen bar over the rule. It is never pen-filled, so it can't be mistaken for the primary button.
+- **Choice:** a 56px tile, 2px control-edge border, 10px radius, centred 600 label with an optional 0.85rem sub-line. Used for product, colour (with a written swatch name), method and text size.
+- **Selected, everywhere:** any `[aria-pressed="true"]` control and the picked-summary tiles are solid pen with white text and a check icon before the label. The icon means the state never rests on colour alone.
+- **Segmented (screen tabs):** equal 56px outlined tabs with a 6px gap, directly above the list they switch. The current one takes the selected style above.
 
 ### Cards / Containers
-- **Total card:** inside the band only. Paper fill, 1px grid border, 10px radius, padding 10px 14px 12px. A 0.9rem pencil label sits over a Display figure. The figure turns red when the card is an alert. The whole card is a link.
+- **Total card:** inside the band only. Paper fill, 1px grid border, 10px radius, padding 10px 14px 12px. A 0.9rem pencil label sits over a Display figure. The whole card is a link.
 - **Notices:** warn (red blot, dried red ink, 1px red blot edge) and info (blotter, deep blue ink). Both are 10px radius, padding 12px 14px, 0.95rem.
 - **Empty state:** centred pencil text on band tint with a 2px dashed grid border, 10px radius.
 - **Shadow Strategy:** none (see Elevation & Depth).
@@ -355,11 +348,12 @@ Firm and plain: outlined pen-blue on paper, filled only for the main action.
 - **Read-only:** band fill, pencil text.
 
 ### Navigation
-- **Tab bar:** fixed to the bottom, paper fill, 2px grid top border, five equal 64px cells that never move: Hôm nay, Sổ tiền, Sản xuất, Đơn hàng, Kho hàng. Nhập hàng opens from the primary button at the top of Kho hàng (its pages light the Kho tab and go back to Kho); Báo cáo opens from Mẹ's "Lãi tháng" row on Hôm nay (it lights Hôm nay). Each cell has a 26px stroked SVG icon over a min(0.875rem, 4.1vw) / 600 label in pencil; the label does not grow with the text setting so all five always fit on one line. Active (`aria-current="page"`): red label and a red notch hanging from the top border.
-- **Back link:** pen-blue text with a 24px chevron, min 40px, at the top of the band on sub-screens. Sub-screen bands are compact (title min(1.25rem, 6vw), 12px bottom padding) so large text still leaves room for content.
-- **Link row:** a 52px pen-blue text link with a chevron under a list ("Xem tất cả … khách đang nợ"), used instead of a second big button.
-- **Money group heading:** in Tiền đã thu each holder is a real h3 ("Chưa rõ ai cầm · 3 khoản") with its red total on the right, not a fake ledger row. Unclear money is listed first.
-- **Person button:** a 44px pill on the right of the band showing who is using the phone. It opens the sheet with the person picker and the text-size choice (Vừa / To / Rất to).
+- **Tab bar:** fixed to the bottom, paper fill, 2px grid top border, five equal 64px cells that never move: Hôm nay, Sổ tiền, Sản xuất, Đơn hàng, Kho hàng. Nhập hàng opens from the primary button at the top of Kho hàng (its pages light the Kho tab and go back to Kho); Báo cáo opens from Mẹ's "Lãi tháng" row on Hôm nay (it lights Hôm nay). Each cell has a stroked SVG icon (at least 26px, 1.3rem) over a 0.8rem / 600 label in pencil. Both grow with the text setting: at Vừa the label sits on one line, at To and Rất to each word takes its own line ("Đơn / hàng"), so all five always fit. The bar's height is measured into `--tabh`, and the page padding, sticky bars and toast all sit on it. Active (`aria-current="page"`): red label and a red notch hanging from the top border.
+- **Save bar:** the save button on Ghi tiền and Sản xuất, and the order form's bar, stick to the top of the tab bar. A field focused under one scrolls up clear of it.
+- **Back button:** a secondary button with a left arrow, "Quay lại", at the top of the band on sub-screens. Sub-screen bands are compact (title min(1.25rem, 6vw), 12px bottom padding) so large text still leaves room for content.
+- **Link row:** a 48px text link with a chevron under a list ("Xem tất cả … khách đang nợ"), used instead of a second big button.
+- **Money group heading:** in Tiền đã thu each holder is a real h3 ("Chưa rõ ai cầm · 3 khoản") with its pen-blue total on the right, not a fake ledger row. Unclear money is listed first.
+- **Person button:** a secondary button on the right of the band showing who is using the phone. It opens the sheet with the person picker and the text-size choice (Vừa / To / Rất to).
 
 ### Header Band (signature)
 Ô ly tint with a 22px grid of barely visible grid-faint lines and a 2px grid bottom border. It contains the headline, a pencil sub-line (the lunar date, with its key part in pen-blue 600, because a date is a number, not an alarm), the sync status line, and optionally two total cards side by side.
@@ -368,7 +362,7 @@ Firm and plain: outlined pen-blue on paper, filled only for the main action.
 A 0.85rem / 600 pencil line under the band sub-line with a 9px dot in front. Live: green dot, "Sổ chung". Loading: edge-coloured dot. Stale or read-only: red text and red dot. It is announced as `role="status"`.
 
 ### Margin Ledger (signature)
-A list with an absolutely positioned 2px red rule at `--m`, at 85% opacity, running the full height. Each row puts a Row-label (and Note sub-line) left of the rule and a Figure or Figure-md right of it, right-aligned, with a stacked unit or sub-line and a 18px control-edge chevron when tappable. Pressed rows fill with blotter. Alert rows turn the figure red. Done rows turn it pencil. Void rows strike through the label and the amount in pencil and carry a grey HỦY stamp. A delivered trip is one row, and its items are grouped in the sub-line with one product per line and colours summed under each product.
+A list with an absolutely positioned 1px ruled line at `--m`, running the full height. Each row puts a Row-label (and Note sub-line) left of the rule and a Figure or Figure-md right of it, right-aligned, with a stacked unit or sub-line and a 18px control-edge chevron when tappable. Pressed rows fill with blotter. Alert rows turn the figure red. Done rows turn it pencil. Void rows strike through the label and the amount in pencil and carry a grey HỦY stamp. A delivered trip is one row, and its items are grouped in the sub-line with one product per line and colours summed under each product.
 
 ### Stamp (signature)
 An inline uppercase label, 0.8rem / 700, 0.04em tracking, padding 1px 6px, 2px currentColor border, 4px radius, rotated -3deg. Variants: green (ĐÃ NỘP MẸ, ĐÃ TRẢ), pen (TÀI KHOẢN MẸ, and CHƯA VỀ MẸ for a trip paid with money that has not reached Mẹ yet: settled, not debt, so never red), red (HẾT, CẦN ĐẶT, "… CẦM", CHƯA RÕ AI CẦM), grey (HỦY). A stamp-in keyframe plays once when money reaches Mẹ (ĐÃ NỘP MẸ / TÀI KHOẢN MẸ): it starts at scale 1.8 and transparent and lands at scale 1 in .45s with cubic-bezier(.16,1,.3,1). It is disabled under reduced motion.
@@ -379,7 +373,7 @@ A 72px minus/plus button pair (pen outline) flanking a 2px edge-bordered numeric
 ### Toast and Sheet
 - **Toast:** dark ink bar fixed above the tab bar, white text, with a white-outlined "Ghi nhầm" undo button (8px radius, min 44px). It slides up 16px and fades in (.35s cubic-bezier(.16,1,.3,1), opacity .25s ease-out). It stays for 8s when undo is offered, otherwise 4s, and pauses while pointed at or focused. Swiping it sideways or down (or Esc) puts it away; a short swipe springs back.
 - **Sheet:** paper panel docked to the bottom, 16px top corners, a stack of big block buttons with 10px gaps, over a 35% black scrim. At most one primary; alternatives sit in a two-column choice grid under a bold question; the exits ("Xem sổ của khách", "Thôi") are text links on one line at the bottom, "Thôi" in pencil.
-- **Unknown-holder money:** a "Chưa rõ ai cầm" group never gets an all-at-once confirm. Each line says "ai cầm?" and its sheet asks "Ai đang cầm khoản này?" with Mẹ cầm rồi / Bác Khang / Người khác / Tài khoản Mẹ (by payment method), so money always has a holder before it counts as đã về tay Mẹ. Mẹ's home row then asks "Ai đang cầm 3 khoản tiền?" and opens the sheet itself: each answer moves straight to the next unknown payment ("Khoản 2/3", with the last answer and its "Ghi nhầm" on top, "Để sau" to stop) and ends back on the page she started from. Anyone else can tap an unknown line and choose "Tôi đang cầm khoản này" (only Mẹ marks money received), and their home card shows "Bác Khang đang cầm …" instead of a red total.
+- **Unknown-holder money:** a "Chưa rõ ai cầm" group never gets an all-at-once confirm. Each line says "ai cầm?" and its sheet asks "Ai đang cầm khoản này?" with Mẹ cầm rồi / Bác Khang / Người khác / Tài khoản Mẹ (by payment method), so money always has a holder before it counts as đã về tay Mẹ. Mẹ's home row then asks "Ai đang cầm 3 khoản tiền?" and opens the sheet itself: each answer moves straight to the next unknown payment ("Khoản 2/3", with the last answer and its "Ghi nhầm" on top, "Để sau" to stop) and ends back on the page she started from. Anyone else can tap an unknown line and choose "Tôi đang cầm khoản này" (only Mẹ marks money received), and their home card shows "Bác Khang đang cầm …" instead of the owner's total.
 - **Sheet focus:** a sheet opens with focus on its title, never on a money button, and closing it returns focus to the line that opened it, even after the page redraws. The faded toast is visibility-hidden so its button can't be reached.
 
 ### Order List (Đơn hàng)
@@ -395,23 +389,25 @@ Only what recording a payment needs: a search field that matches names without d
 Mẹ's Hôm nay only, under "Ghi sản xuất". One horizontal bar per day for the last seven days, oldest first, in pen blue at 70% with today at full strength, a bolder value and a darker day label. Horizontal so every value stays readable at Rất to. No grid, no axis, no legend: each value sits at the end of its bar in the short form (4,2tr / 850k), with the exact amount for screen readers. A day with no sales shows "—". Bars are 16px tall with 4px right corners. The whole chart links to Báo cáo. This is the one exception to the short-form-only-in-band-cards rule.
 
 ### Bill (Hoá đơn)
-One trip (one customer, one day) as a bill. The band shows one full-width card with the payment state ("Chưa trả · 2 ngày" in red, or "Đã trả đủ"). Lines are one per kind and price: the kind's name, then its colours as swatch + count + name ("● 6 Vàng ○ 4 Trắng"), then "14 thùng × 485.000"; the line amount sits right of the margin. A total row sits under a 2px ink rule. Under it, "Đã trả" lists each payment that paid this trip (oldest trip first), with its holder, then a red "Còn nợ" row. Then "Ghi tiền trả" as the one primary action (only when something is owed), "Gửi Zalo" (copies the bill as text and opens the customer's Zalo when a phone is known) beside "Sổ của khách", who recorded it, and for Mẹ a quiet red text action to cancel the bill.
+One trip (one customer, one day) as a bill. The band shows one full-width card with the payment state ("Chưa trả · 2 ngày", or "Đã trả đủ"). Lines are one per kind and price: the kind's name, then its colours as swatch + count + name ("● 6 Vàng ○ 4 Trắng"), then "14 thùng × 485.000"; the line amount sits right of the margin. A total row sits under a 2px ink rule. Under it, "Đã trả" lists each payment that paid this trip (oldest trip first), with its holder, then a red "Còn nợ" row. Then "Ghi tiền trả" as the one primary action (only when something is owed), "Gửi Zalo" (copies the bill as text and opens the customer's Zalo when a phone is known) beside "Sổ của khách", who recorded it, and for Mẹ a quiet red text action to cancel the bill.
 
 ## Do's and Don'ts
 
 ### Do:
-- **Do** put the label left of the red margin rule and the figure right of it, right-aligned in pen blue, on every list of things and amounts.
+- **Do** put the label left of the ruled line and the figure right of it, right-aligned in pen blue, on every list of things and amounts.
+- **Do** open every section with `h2.sec` and `--section` (28px) above it, on every screen.
 - **Do** set every size in rem from the 112.5% root so the 125% and 140% text settings scale the whole page.
 - **Do** cap big figures with `min(<rem>, <vw>)` and `nowrap` instead of letting them wrap.
 - **Do** record a state with a stamp (uppercase, 2px currentColor border, -3deg), and keep void entries visible, struck through, with HỦY.
 - **Do** use 2px control-edge (#7f86bd) borders on inputs, choices and chips, and 2px pen borders on buttons.
-- **Do** keep targets at 48px or more (52px default, 64px for main actions, 72px for ledger rows and steppers).
+- **Do** keep targets at 48px or more (56px for buttons, inputs and choices, 72px for ledger rows and steppers), including text links and the toast's "Ghi nhầm".
+- **Do** let a stamp under a figure wrap rather than shrink the figure. Figures stop shrinking at 16px.
 - **Do** write the colour name beside every product swatch.
 - **Do** use inline stroked SVG icons (stroke 2–2.5, round caps) in currentColor.
 
 ### Don't:
 - **Don't** build KPI tiles, grey cards or a tile grid. Totals live in the band, and everything else is a ledger.
-- **Don't** use pen blue as decoration or red outside the margin rule, the active tab and alarms.
+- **Don't** use pen blue as decoration or red outside out of stock, overdue and sync errors.
 - **Don't** put the ô ly grid pattern behind tables, lists or forms. It belongs to the header band.
 - **Don't** delete or hide a cancelled entry. Strike it through and stamp it.
 - **Don't** add shadows to on-page elements. Only the toast lifts.
@@ -421,8 +417,8 @@ One trip (one customer, one day) as a bill. The band shows one full-width card w
 - **Do** keep every colour in the `:root` tokens (pen-press, pen-ink, red-ink, red-line, dye-do, dye-vang, swatch-line, scrim, lift); no literal hex in rules.
 - **Do** name who holds the money: choosing "Người khác…" or "Tài khoản khác…" on Tiền đã thu asks for a name and offers names used before; the name becomes the holder.
 - **Do** leave the payment method unselected on Ghi tiền.
-- **Do** show "Chưa về tay Mẹ" and "… đang cầm" figures in red, except on Hôm nay (see the Calm Home Rule). CHƯA VỀ MẸ on a paid trip stays a pen stamp, because that trip is settled.
-- **Do** make the red figure on a trip what's still owed, with the trip total in the small line ("còn nợ, trên 3.520.000"), so red figures add up to the debt.
+- **Do** show "Chưa về tay Mẹ" and "… đang cầm" figures in pen blue. CHƯA VỀ MẸ on a paid trip is a pen stamp too.
+- **Do** make the figure on an unpaid trip what's still owed, with the trip total in the small line ("còn nợ, trên 3.520.000"), so those figures add up to the debt.
 - **Do** default payments to the oldest trip. Mẹ can reassign one by tapping it on the customer page (#/tien/chia/<id>). Money not assigned falls to the oldest trip.
 - **Don't** show a big 0 in a band card or a month row. Show last month, or a small grey "Chưa có".
 - **Don't** offer a hard delete anywhere, including on lines that are already cancelled.

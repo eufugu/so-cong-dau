@@ -23,9 +23,11 @@
   --swatch-line: rgba(0, 0, 0, .25);
   --scrim: rgba(0, 0, 0, .35);
   --lift: rgba(0, 0, 0, .22);
-  --margin: 2px;
+  --margin: 1px;
+  --section: 28px;
+  --check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 5 5 9-10'/%3E%3C/svg%3E");
   --r: 10px;
-  --tap: 52px;
+  --tap: 56px;
   --font: "Be Vietnam Pro", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   color-scheme: light;
 }
@@ -48,6 +50,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
 a { color: var(--pen); text-underline-offset: 3px; }
 .size-pick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.size-pick .choice { padding-inline: 4px; }
 .size-pick .choice:nth-child(2) { font-size: min(1.2rem, 5.4vw); }
 .size-pick .choice:nth-child(3) { font-size: min(1.4rem, 6vw); }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
@@ -78,16 +81,12 @@ main { flex: 1; padding-bottom: calc(var(--tabh, 66px) + 30px); }
 .sync.stale { color: var(--red); }
 .sync.stale::before { background: var(--red); }
 .who {
-  flex: none; min-height: 48px; padding: 0 10px; border-radius: 999px;
-  border: 2px solid var(--edge); background: var(--paper); font-weight: 600; font-size: min(0.9rem, 4.4vw);
+  flex: none; min-height: var(--tap); padding: 0 10px; border-radius: var(--r);
+  border: 2px solid var(--pen); background: var(--paper); color: var(--pen); font-weight: 700; font-size: min(0.9rem, 4.4vw);
   display: inline-flex; align-items: center; gap: 6px;
 }
 .who svg { width: 18px; height: 18px; }
-.back {
-  min-height: 48px; padding: 0 8px 0 2px; margin-left: -4px; border: 0; background: none;
-  display: inline-flex; align-items: center; gap: 2px; font-weight: 600; color: var(--pen);
-}
-.back svg { width: 24px; height: 24px; }
+.btn.back { display: inline-flex; padding: 0 14px 0 10px; margin-bottom: 8px; }
 .totals { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; margin-top: 14px; }
 .totals > :only-child { grid-column: 1 / -1; }
 .sheet h2[tabindex]:focus { outline: none; }
@@ -95,14 +94,13 @@ main { flex: 1; padding-bottom: calc(var(--tabh, 66px) + 30px); }
 .total > span { display: block; font-size: min(0.9rem, 4.6vw); line-height: 1.25; color: var(--ink-2); font-weight: 500; }
 .total b { display: block; white-space: nowrap; font-size: 2rem; line-height: 1.15; color: var(--pen); font-weight: 700; letter-spacing: -0.01em; }
 .total b small { font-size: 0.7em; font-weight: 600; }
-.total.alert b { color: var(--red); }
 .totals.exact b { font-size: 1.45rem; }
 
-/* The margin ledger: one red rule divides what from how much */
+/* The ledger: a faint rule divides what from how much */
 .ledger { --m: 50%; list-style: none; margin: 0; padding: 0; position: relative; }
 .ledger::before {
   content: ""; position: absolute; top: 0; bottom: 0; left: var(--m);
-  width: var(--margin); background: var(--red); opacity: .85; pointer-events: none;
+  width: var(--margin); background: var(--line); pointer-events: none;
 }
 .ledger.wide { --m: 50%; }
 .ledger > li { border-bottom: 1px solid var(--line); }
@@ -147,11 +145,12 @@ a.pay-new svg { width: 18px; height: 18px; }
 .rev .now .rev-bar { opacity: 1; }
 .rev .now .rev-num { font-weight: 700; }
 /* Hôm nay: trang Mẹ mở mỗi ngày, nên nhẹ hơn các trang sổ */
-.calm .ledger::before { opacity: .35; }
 .calm .total b, .calm .row .much { font-weight: 600; }
 .calm .row.plain .what strong, .calm .row.plain .much { font-weight: 400; }
 
-h2.sec { margin: 28px 16px 8px; font-size: 1.1rem; font-weight: 700; line-height: 1.3; }
+h2.sec { margin: var(--section) 16px 8px; font-size: 1.1rem; font-weight: 700; line-height: 1.3; }
+/* Khoảng cách giữa các phần luôn là --section, kể cả sau khối đã có sẵn lề dưới 16px */
+.actions + h2.sec, .form + h2.sec { margin-top: calc(var(--section) - 16px); }
 h2.sec small a { display: inline-flex; align-items: center; min-height: 48px; }
 h2.sec small { display: block; font-weight: 500; font-size: 0.9rem; color: var(--ink-2); margin-top: 2px; }
 .note { margin: 8px 16px; color: var(--ink-2); font-size: 0.9rem; }
@@ -168,39 +167,37 @@ h2.sec small { display: block; font-weight: 500; font-size: 0.9rem; color: var(-
 .stamp.grey { color: var(--ink-2); }
 
 /* Buttons */
-.btn {
+.btn, .chip {
   display: flex; align-items: center; justify-content: center; gap: 8px;
   min-height: var(--tap); padding: 0 18px; border-radius: var(--r);
   border: 2px solid var(--pen); background: var(--paper); color: var(--pen);
-  font-weight: 700; font-size: 1rem; text-decoration: none;
+  font-weight: 700; font-size: 1.05rem; text-decoration: none; text-align: center; line-height: 1.2;
 }
-.btn svg { width: 22px; height: 22px; }
+.btn svg { width: 22px; height: 22px; flex: none; }
 .btn.primary { background: var(--pen); color: var(--paper); }
-.btn.danger { border-color: var(--red); color: var(--red); }
-.btn.big { min-height: 64px; font-size: 1.15rem; }
 /* Nút xác nhận tiền: chữ một dòng, số tiền một dòng to bên dưới */
 .btn.stacked { flex-direction: column; gap: 2px; padding-block: 12px; min-height: 84px; line-height: 1.25; }
 .btn.stacked span { display: inline-flex; align-items: center; gap: 8px; text-wrap: balance; text-align: center; }
 .btn.stacked b { font-size: min(1.6rem, 7vw); font-weight: 700; letter-spacing: -0.01em; }
 /* Đầu nhóm tiền theo người cầm: tiêu đề thật, không giả làm dòng sổ */
 /* Liên kết nhẹ dưới danh sách: đủ to để chạm, không giành chỗ của nút chính */
-a.link-row { display: flex; align-items: center; justify-content: space-between; min-height: 52px; margin: 0 16px; font-weight: 600; text-decoration: none; color: var(--pen); }
+a.link-row { display: flex; align-items: center; justify-content: space-between; min-height: 48px; margin: 0 16px; font-weight: 600; color: var(--pen); }
 a.link-row .chev { width: 18px; height: 18px; color: var(--edge); }
-h3.grp { margin: 22px 16px 6px; display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 1.05rem; font-weight: 700; }
+h3.grp { margin: var(--section) 16px 8px; display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 1.1rem; font-weight: 700; line-height: 1.3; }
+h2.sec + h3.grp { margin-top: 8px; }
 h3.grp small { display: block; font-size: 0.9rem; font-weight: 500; color: var(--ink-2); }
-h3.grp b { color: var(--red); font-size: min(1.5rem, 6.5vw); white-space: nowrap; }
+h3.grp b { color: var(--pen); font-size: min(1.5rem, 6.5vw); white-space: nowrap; }
 .btn.block { width: 100%; }
 .btn:disabled, .btn.primary:disabled, .od-bar .btn[aria-disabled="true"] { background: var(--grid-soft); border-color: var(--edge); color: var(--ink-2); cursor: not-allowed; }
 .btn.primary:active { background: var(--pen-press); }
 .actions { padding: 16px; display: grid; gap: 10px; }
-.actions.two { grid-template-columns: 1fr 1fr; }
+.actions.two { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.actions.two .btn { padding: 6px 10px; }
 
 /* Segmented control */
 /* Tabs inside a screen: a page you are on, not a button to press */
-.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; margin: 4px 16px 0; border-bottom: 2px solid var(--grid); }
-.seg button { min-height: 52px; padding: 4px 6px; border: 0; background: none; color: var(--ink-2); font-weight: 600; font-size: min(0.9rem, 4.6vw); line-height: 1.2; text-wrap: balance; position: relative; border-radius: var(--r) var(--r) 0 0; }
-.seg button[aria-pressed="true"] { background: var(--pen-soft); color: var(--pen); font-weight: 700; }
-.seg button[aria-pressed="true"]::after { content: ""; position: absolute; left: 0; right: 0; bottom: -2px; height: 4px; background: var(--pen); }
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; margin: 4px 16px 0; }
+.seg button { min-height: var(--tap); padding: 4px 6px; border: 2px solid var(--edge); background: var(--paper); color: var(--ink); font-weight: 600; font-size: min(0.9rem, 4.6vw); line-height: 1.2; text-wrap: balance; border-radius: var(--r); }
 
 /* Forms */
 .form { padding: 8px 16px 16px; display: grid; gap: 18px; }
@@ -217,14 +214,14 @@ h3.grp b { color: var(--red); font-size: min(1.5rem, 6.5vw); white-space: nowrap
 .choices.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .choices.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .choice {
-  min-height: 60px; padding: 8px 10px; border-radius: var(--r); border: 2px solid var(--edge);
+  min-height: var(--tap); padding: 8px 10px; border-radius: var(--r); border: 2px solid var(--edge);
   background: var(--paper); font-weight: 600; font-size: min(1.02rem, 5.2vw); line-height: 1.2; overflow-wrap: anywhere;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; text-align: center;
 }
 .more { margin-top: 10px; }
 .more summary {
   list-style: none; cursor: pointer; min-height: var(--tap); padding: 8px 44px 8px 14px; position: relative;
-  border: 2px solid var(--edge); border-radius: var(--r); font-weight: 600; color: var(--pen);
+  border: 2px solid var(--pen); border-radius: var(--r); font-weight: 700; color: var(--pen);
   display: flex; flex-direction: column; justify-content: center;
 }
 .more summary::-webkit-details-marker { display: none; }
@@ -236,23 +233,19 @@ h3.grp b { color: var(--red); font-size: min(1.5rem, 6.5vw); white-space: nowrap
 .more summary small { font-weight: 500; font-size: 0.85rem; color: var(--ink-2); }
 .more > .choices { margin-top: 10px; }
 .choice small { font-weight: 500; font-size: 0.85rem; color: var(--ink-2); }
-.choice[aria-pressed="true"] { border-color: var(--pen); background: var(--pen-soft); color: var(--pen); outline: 1px solid var(--pen); outline-offset: -3px; }
-.choice[aria-pressed="true"] small { color: var(--pen); }
 .swatch { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--swatch-line); display: inline-block; }
 .swatch.do { background: var(--dye-do); } .swatch.vang { background: var(--dye-vang); } .swatch.trang { background: var(--paper); border-color: var(--edge); }
 .choice.color { flex-direction: column; gap: 6px; }
 .choice .cname { font-size: min(1.1rem, 5.4vw); font-weight: 700; }
-.picked button small { display: block; font-size: 0.8rem; font-weight: 500; color: var(--ink-2); }
+.picked button small { display: block; font-size: 0.85rem; font-weight: 500; }
 table.stock th small.kg { display: block; font-size: 0.8rem; font-weight: 500; color: var(--ink-2); }
 .choice small { display: block; }
-details.more.data { margin-top: 28px; }
+details.more.data { margin-top: var(--section); }
 .swatch.big { width: 44px; height: 44px; }
 .swatch.sm { width: 16px; height: 16px; vertical-align: -2px; margin-right: 6px; border-width: 1.5px; }
 .choice.color { min-height: 76px; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .chips.two { display: grid; grid-template-columns: 1fr 1fr; }
-.chips.two .chip { min-height: 56px; font-size: 1.1rem; border-radius: var(--r); }
-.chip { min-height: 48px; padding: 0 16px; border-radius: 999px; border: 2px solid var(--edge); background: var(--paper); font-weight: 600; font-size: 0.9rem; }
 
 .stepper { display: grid; grid-template-columns: 72px 1fr 72px; gap: 10px; align-items: stretch; }
 .stepper button { min-height: 72px; border-radius: var(--r); border: 2px solid var(--pen); background: var(--paper); color: var(--pen); }
@@ -267,7 +260,7 @@ details.more.data { margin-top: 28px; }
 /* What has been picked so far: two equal tiles, tap one to pick again */
 .picked { margin: 12px 16px 0; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .picked button {
-  min-height: 52px; border: 2px solid var(--pen); background: var(--pen-soft); color: var(--pen); border-radius: var(--r);
+  min-height: var(--tap); border: 2px solid var(--pen); border-radius: var(--r);
   padding: 6px 12px; font-weight: 700; font-size: 1.05rem; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.2; overflow-wrap: anywhere; min-width: 0;
 }
 /* Ô lẻ cuối cùng trong lưới hai cột trải hết hàng, khỏi đứng trơ một mình */
@@ -306,14 +299,10 @@ details.more.data { margin-top: 28px; }
 .search { margin: 4px 16px 0; }
 .search .input { font-size: 1.05rem; }
 .day-head small { font-variant-numeric: tabular-nums; }
-.row .much small .due { color: var(--red); font-weight: 600; }
 .counts { display: inline; }
 .swatch.mid { width: 28px; height: 28px; }
-.btn.quiet { border-color: transparent; background: none; color: var(--red); text-decoration: underline; text-underline-offset: 3px; font-weight: 600; }
 button.link { min-height: 48px; padding: 0 2px; border: 0; background: none; color: var(--pen); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
-button.link[aria-pressed="true"] { text-decoration: none; }
-button.link.soft { color: var(--ink-2); font-weight: 500; }
-button.link.danger { color: var(--red); }
+button.link[aria-pressed="true"] { text-decoration: none; padding: 0 10px; border-radius: var(--r); }
 .sheet-links button.link { min-width: 48px; padding: 0 8px; }
 .sheet .warn { margin: 0; }
 /* Vừa ghi xong một khoản: nhắc lại và cho Ghi nhầm ngay trong bảng */
@@ -324,10 +313,10 @@ button.link.danger { color: var(--red); }
 .alloc { display: grid; }
 .alloc-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 46%); gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
 .alloc-row label { display: block; font-weight: 600; }
-.alloc-row small { display: block; color: var(--red); font-size: 0.9rem; font-weight: 600; }
+.alloc-row small { display: block; color: var(--ink-2); font-size: 0.9rem; font-weight: 500; }
 .alloc-row .input { text-align: right; font-weight: 700; color: var(--pen); }
 .alloc-left { margin: 8px 0 0; min-height: 1.4em; color: var(--ink-2); font-size: 0.9rem; }
-.alloc-left .due { color: var(--red); font-weight: 700; }
+.alloc-left b { color: var(--ink); font-weight: 700; }
 /* Bảng chọn: hai lối thoát nhỏ ở cuối, không tranh với nút chính */
 .sheet-links { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 4px; }
 .sheet .ask { margin: 8px 0 0; color: var(--ink); font-weight: 600; }
@@ -341,8 +330,8 @@ table.stock thead .swatch.sm { display: block; margin: 0 0 4px auto; }
 .row .what strong small.kg { font-size: 0.8rem; font-weight: 500; color: var(--ink-2); }
 
 /* Lên đơn mới */
-.form h2.sec { margin: 4px 0 8px; }
-.choices.cust .choice { min-height: 56px; }
+.form h2.sec { margin: calc(var(--section) - 18px) 0 8px; }
+.form > h2.sec:first-child { margin-top: 0; }
 .other-cust { margin-top: 10px; }
 .cell.filled:not(.over) { border-color: var(--pen); background: var(--pen-soft); }
 .od-bar {
@@ -354,13 +343,13 @@ table.stock thead .swatch.sm { display: block; margin: 0 0 4px auto; }
 .od-total b { display: block; font-size: min(1.6rem, 6.6vw); line-height: 1.1; font-weight: 700; color: var(--pen); white-space: nowrap; }
 .od-total small { display: block; color: var(--ink-2); font-size: 0.9rem; font-weight: 500; line-height: 1.25; }
 .od-total small.due { color: var(--red); font-weight: 700; }
-.od-bar .btn { min-height: 56px; padding: 0 16px; font-size: min(1.1rem, 5.2vw); white-space: nowrap; }
+.od-bar .btn { padding: 0 16px; white-space: nowrap; }
 
 
 /* A field label with a side link (Khách · + Khách mới) */
 .label-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
 .label-row label { font-weight: 600; }
-.label-row a { display: inline-flex; align-items: center; gap: 4px; min-height: 48px; font-weight: 600; text-decoration: none; }
+.label-row a { display: inline-flex; align-items: center; gap: 4px; min-height: 48px; font-weight: 600; }
 .label-row a svg { width: 18px; height: 18px; }
 .input.qty { font-size: min(1.4rem, 6.5vw); font-weight: 700; color: var(--pen); text-align: right; }
 .hits { display: grid; gap: 8px; }
@@ -371,6 +360,7 @@ table.stock thead .swatch.sm { display: block; margin: 0 0 4px auto; }
 .ledger.sum .what strong { font-size: 1.15rem; font-weight: 700; }
 .ledger.sum .much { font-size: 1.45rem; }
 
+.warn.flush { margin: 0; }
 .warn { margin: 0 16px; padding: 12px 14px; border-radius: var(--r); background: var(--red-soft); color: var(--red-ink); font-size: 0.95rem; border: 1px solid var(--red-line); }
 .info { margin: 0 16px; padding: 12px 14px; border-radius: var(--r); background: var(--pen-soft); color: var(--pen-ink); font-size: 0.95rem; }
 
@@ -400,8 +390,8 @@ table.stock tr:last-child td { border-bottom: 0; }
 .tabs a span { white-space: nowrap; }
 html:not([data-size="0"]) .tabs a span { white-space: normal; width: min-content; }
 .tabs a svg { width: max(26px, 1.3rem); height: max(26px, 1.3rem); flex: none; }
-.tabs a[aria-current="page"] { color: var(--red); }
-.tabs a[aria-current="page"]::before { content: ""; position: absolute; top: -2px; left: 22%; right: 22%; height: 4px; border-radius: 0 0 3px 3px; background: var(--red); }
+.tabs a[aria-current="page"] { color: var(--pen); }
+.tabs a[aria-current="page"]::before { content: ""; position: absolute; top: -2px; left: 22%; right: 22%; height: 4px; border-radius: 0 0 3px 3px; background: var(--pen); }
 
 /* Toast with undo */
 .toast {
@@ -422,6 +412,7 @@ html:not([data-size="0"]) .tabs a span { white-space: normal; width: min-content
   /* Chữ to: bảng tự cuộn bên trong, nút nào cũng chạm tới được */
   max-height: calc(100dvh - 16px); overflow-y: auto; overscroll-behavior: contain; }
 .sheet h2 { margin: 0 0 4px; font-size: 1.15rem; }
+.sheet h2.sheet-sub { margin-top: 12px; }
 .sheet p { margin: 0 0 6px; color: var(--ink-2); }
 
 /* Stamp-in on save: the one authored motion */
@@ -441,3 +432,14 @@ html:not([data-size="0"]) .tabs a span { white-space: normal; width: min-content
 .gated main { padding-bottom: 24px; }
 .gate-wait { margin: 0; padding: 40px 16px; text-align: center; color: var(--ink-2); font-size: 1.1rem; }
 .input.pin { font-size: 1.6rem; font-weight: 700; letter-spacing: 0.3em; color: var(--pen); text-align: center; }
+
+/* Một kiểu "đã chọn" cho mọi nơi: nền mực, chữ trắng, dấu tích */
+button[aria-pressed="true"], .picked button { background: var(--pen); border-color: var(--pen); color: var(--paper); font-weight: 700; }
+button[aria-pressed="true"] small, .picked button small { color: var(--paper); }
+button[aria-pressed="true"]::before, .picked button::before {
+  content: ""; display: inline-block; flex: none; width: 1.05em; height: 1.05em; margin-right: 4px; vertical-align: -0.15em;
+  background: currentColor; -webkit-mask: var(--check) center / contain no-repeat; mask: var(--check) center / contain no-repeat;
+}
+/* Trong ô: dấu tích đứng trước chữ, dòng phụ xuống hàng dưới */
+.choice[aria-pressed="true"], .picked button { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: center; column-gap: 0; }
+.choice[aria-pressed="true"] small, .picked button small { flex-basis: 100%; }

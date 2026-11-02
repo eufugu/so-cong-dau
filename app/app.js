@@ -161,7 +161,7 @@
     sheet(`<h2 id="sheet-title">Có dòng chưa được nhận</h2>
       <p>Sổ chung không nhận dòng này: bạn chưa có quyền. Dòng đã được bỏ.</p>
       <ul class="note">${rejected.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>
-      <button class="btn big block primary" data-action="reject-ok">Đã hiểu</button>`);
+      <button class="btn block primary" data-action="reject-ok">Đã hiểu</button>`);
   }
   function writeFailed(e, col, id) {
     if (mirror[col]) mirror[col].delete(id);  // lần lưu sau sẽ gửi lại
@@ -508,12 +508,12 @@
     const head = (sub) => `<header class="band"><div class="band-top"><div><h1>Sổ công dầu</h1>${sub ? `<p class="sub">${sub}</p>` : ""}</div></div></header>`;
     if (gate === "loading") return `<p class="gate-wait" role="status">Đang mở sổ…</p>`;
     if (gate === "offline") return head("") + `<div class="form">
-      <p class="warn" role="alert" style="margin:0">Chưa có mạng. Có mạng lại rồi bấm Thử lại.</p>
-      <button class="btn primary big block" data-action="retry-profile">Thử lại</button>
-      <button class="btn big block" data-action="sign-out">Đăng xuất</button></div>`;
+      <p class="warn flush" role="alert">Chưa có mạng. Có mạng lại rồi bấm Thử lại.</p>
+      <button class="btn primary block" data-action="retry-profile">Thử lại</button>
+      <button class="btn block" data-action="sign-out">Đăng xuất</button></div>`;
     if (gate === "denied") return head("") + `<div class="form">
-      <p class="warn" role="alert" style="margin:0">Tài khoản này chưa được cấp quyền. Báo Mẹ hoặc người quản lý.</p>
-      <button class="btn big block" data-action="sign-out">Đăng xuất</button></div>`;
+      <p class="warn flush" role="alert">Tài khoản này chưa được cấp quyền. Báo Mẹ hoặc người quản lý.</p>
+      <button class="btn block" data-action="sign-out">Đăng xuất</button></div>`;
     const list = window.SO_PEOPLE || [];
     if (!list.length) return head("") + `<p class="empty">Chưa có tài khoản nào. Báo người quản lý.</p>`;
     return head("Chọn tên của bạn, rồi nhập mã PIN.") + `<form class="form" id="signin-form" novalidate>
@@ -527,8 +527,8 @@
         <label for="pin">Mã PIN</label>
         <input class="input pin" id="pin" type="password" inputmode="numeric" autocomplete="current-password" maxlength="6" placeholder="6 chữ số">
       </div>
-      ${gateState.err ? `<p class="warn" id="signin-err" role="alert" style="margin:0">${esc(gateState.err)}</p>` : ""}
-      <button class="btn primary big" type="submit" id="signin-btn">Đăng nhập</button>
+      ${gateState.err ? `<p class="warn flush" id="signin-err" role="alert">${esc(gateState.err)}</p>` : ""}
+      <button class="btn primary" type="submit" id="signin-btn">Đăng nhập</button>
     </form>`;
   }
   function renderGate() {
@@ -667,7 +667,7 @@
   // ---------- Khung giao diện ----------
   const ICON = {
     chev: '<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>',
-    back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>',
+    back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m11 6-6 6 6 6"/></svg>',
     user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>',
     plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
     minus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"/></svg>',
@@ -686,7 +686,7 @@
   }
   function band({ title, sub = "", back = null, totals = "", exact = false }) {
     return `<header class="band${back ? " compact" : ""}">
-      ${back ? `<a class="back" href="${back}">${ICON.back}Quay lại</a>` : ""}
+      ${back ? `<a class="btn back" href="${back}">${ICON.back}Quay lại</a>` : ""}
       <div class="band-top">
         <h1>${title}</h1>
         ${back ? "" : `<button class="who" data-action="who" aria-label="Người đang dùng: ${esc(me() || "chưa chọn")}. Bấm để ${canShare ? "mở bảng chọn" : "đổi"}">${ICON.user}${esc(me() || "Chọn người")}</button>`}
@@ -695,8 +695,8 @@
       ${totals ? `<div class="totals${exact ? " exact" : ""}">${totals}</div>` : ""}
     </header>`;
   }
-  const total = (lbl, val, href, alert) =>
-    `<a class="total${alert ? " alert" : ""}" href="${href}"><span>${lbl}</span><b>${val}</b></a>`;
+  const total = (lbl, val, href) =>
+    `<a class="total" href="${href}"><span>${lbl}</span><b>${val}</b></a>`;
 
   function row({ href, what, sub = "", much, muchSub = "", cls = "", md = false, action = "" }) {
     const inner = `<span class="what"><strong>${what}</strong>${sub ? `<small>${sub}</small>` : ""}</span>
@@ -762,7 +762,7 @@
     const moneyRow = !isOwner() || outTotal <= 0 ? "" : unk
       ? row({ action: 'data-action="ask-next"', what: `Ai đang cầm ${unk.items.length > 1 ? `${unk.items.length} khoản tiền` : "khoản tiền này"}?`, much: num(unk.total), md: true, cls: "plain" })
       : row({ href: "#/tien/thu", what: out.length === 1 && WITH_OWNER.includes(out[0].holder) ? "Xác nhận Mẹ đã nhận tiền" : out.length === 1 ? `Nhận tiền từ ${esc(out[0].holder)}` : "Nhận tiền đang ở chỗ người khác", much: num(outTotal), md: true, cls: "plain" });
-    const mainBtn = isOwner() ? "" : `<div class="actions"><a class="btn primary big" href="#/sx">${ICON.plus}Ghi sản xuất hôm nay</a></div>`;
+    const mainBtn = isOwner() ? "" : `<div class="actions"><a class="btn primary" href="#/sx">${ICON.plus}Ghi sản xuất hôm nay</a></div>`;
     const holyText = holy ? (holy.days === 0 ? ` · hôm nay là ${holy.name}` : ` · ${holy.days} ngày nữa tới ${holy.name}`) : "";
 
     return `<div class="calm">` + band({
@@ -782,7 +782,7 @@
       ${row({ href: "#/kho", what: "Thùng trong kho", much: num(totalCartons), muchSub: "thùng" })}
       ${t ? row({ href: "#/kho#tec", what: "Téc còn dầu", much: tanks(t.est), muchSub: "téc", cls: t.est <= 3 ? "alert" : "" }) : ""}
       ${row({ href: "#/kho#vattu", what: "Vật tư cần đặt", much: String(mats.length), muchSub: "loại", cls: mats.length ? "alert" : "done" })}
-      ${row({ href: "#/sx", what: "Hôm nay đã làm được", sub: todays.length ? todays.slice(0, 2).map((x) => esc(label(product(x.product), x.color))).join(", ") + (todays.length > 2 ? "…" : "") : late && !isOwner() ? "Chiều rồi mà chưa ghi. Nhớ ghi nhé!" : "Chưa ghi thùng nào", much: todayCartons ? String(todayCartons) : '<span class="none">—</span>', muchSub: todayCartons ? "thùng" : "", cls: late && !isOwner() ? "alert" : "" })}
+      ${row({ href: "#/sx", what: "Hôm nay đã làm được", sub: todays.length ? todays.slice(0, 2).map((x) => esc(label(product(x.product), x.color))).join(", ") + (todays.length > 2 ? "…" : "") : late && !isOwner() ? "Chiều rồi mà chưa ghi. Nhớ ghi nhé!" : "Chưa ghi thùng nào", much: todayCartons ? String(todayCartons) : '<span class="none">—</span>', muchSub: todayCartons ? "thùng" : "" })}
       ${isOwner() ? (revMonth || !soldPrev.length
         ? row({ href: "#/baocao", what: `Lãi tháng ${Number(month.slice(5))}`, sub: revMonth ? `Bán được ${num(revMonth)}` : "Tháng này chưa bán thùng nào", much: revMonth ? num(Math.round(profitMonth / 1000) * 1000) : "—", md: true })
         : row({ href: "#/baocao", what: `Lãi tháng ${Number(prevMonth.slice(5))}`, sub: `Tháng ${Number(month.slice(5))} chưa bán thùng nào`, much: num(Math.round(profitPrev / 1000) * 1000), md: true })) : ""}
@@ -804,7 +804,7 @@
     const unusedMats = db.materials.filter((m) => materialStatus(m) === "CHƯA THEO DÕI");
     const cell = (n) => `<td class="${n <= 0 ? "zero" : ""}">${n <= 0 ? "Hết" : num(n)}</td>`;
     return band({ title: "Kho hàng" }) + `
-    <div class="actions"><a class="btn primary big" href="#/nhap">${ICON.plus}Nhập hàng</a></div>
+    <div class="actions"><a class="btn primary" href="#/nhap">${ICON.plus}Nhập hàng</a></div>
     <h2 class="sec" id="thanhpham">Dầu thành phẩm <small>đơn vị: thùng</small></h2>
     ${(db.meta.textSize || 0) > 0 ? `<ul class="ledger">${oils.map((p) => row({
       // Chữ to: bảng 5 cột không vừa, mỗi loại một dòng, các màu ghi bên dưới
@@ -842,7 +842,7 @@
       <button class="btn" data-action="export">Lưu dự phòng</button>
       <button class="btn" data-action="import">Mở file dự phòng</button>
     </div>
-    ${isOwner() ? `<div class="actions"><button class="btn danger" data-action="reset">Xóa hết, bắt đầu lại từ file Excel</button></div>` : ""}`}
+    ${isOwner() ? `<div class="actions"><button class="btn" data-action="reset">Xóa hết, bắt đầu lại từ file Excel</button></div>` : ""}`}
     <p class="note">Mỗi tuần nên bấm “Lưu dự phòng” một lần.</p></details>`;
   }
 
@@ -859,17 +859,17 @@
     const [paidM, nccPaid] = ncc ? monthPick((m) => sum(live(db.supplierPays).filter((p) => String(p.date).slice(0, 7) === m), (p) => p.amount)) : [month, 0];
     const head = band({
       title: "Sổ tiền",
-      totals: total("Khách còn nợ", short(debt), "#/tien", debt > 0) + total("Chưa về tay Mẹ", short(outTotal), "#/tien/thu", outTotal > 0),
+      totals: total("Khách còn nợ", short(debt), "#/tien") + total("Chưa về tay Mẹ", short(outTotal), "#/tien/thu"),
     }) + `<div class="actions">${ncc
-      ? (isOwner() ? `<a class="btn primary big" href="#/tien/tra">${ICON.plus}Ghi trả nhà cung cấp</a>` : "")
-      : `<a class="btn${tab === "thu" ? "" : " primary"} big" href="#/tien/ghi">${ICON.plus}Ghi tiền khách trả</a>`}</div>
+      ? (isOwner() ? `<a class="btn primary" href="#/tien/tra">${ICON.plus}Ghi trả nhà cung cấp</a>` : "")
+      : `<a class="btn${tab === "thu" ? "" : " primary"}" href="#/tien/ghi">${ICON.plus}Ghi tiền khách trả</a>`}</div>
     ${seg([["#/tien", "Khách nợ", "no"], ["#/tien/thu", "Tiền đã thu", "thu"], ["#/tien/ncc", "Nhà cung cấp", "ncc"]], tab === "thu" ? "thu" : ncc ? "ncc" : "no")}`;
 
     if (ncc) {
       const ss = suppliers();
       const owing = ss.filter((s) => s.owed > 0), clear = ss.filter((s) => s.owed <= 0);
       // Món nợ lớn lên đầu; số tổng và số đã trả xuống dưới
-      return head + `${owing.length ? `<h2 class="sec">${owing.length === 1 ? "Mình còn nợ" : `Mình còn nợ <small>${owing.length} nơi · ${num(nccOwed)}</small>`}</h2><ul class="ledger">${owing.map((s) => row({ href: `#/ncc/${enc(s.name)}`, what: esc(s.name), sub: s.paid ? `Đã trả ${num(s.paid)}` : "Chưa trả lần nào", much: num(s.owed), md: true, cls: "alert" })).join("")}</ul>` : `<p class="empty">Không còn nợ nhà cung cấp nào.</p>`}
+      return head + `${owing.length ? `<h2 class="sec">${owing.length === 1 ? "Mình còn nợ" : `Mình còn nợ <small>${owing.length} nơi · ${num(nccOwed)}</small>`}</h2><ul class="ledger">${owing.map((s) => row({ href: `#/ncc/${enc(s.name)}`, what: esc(s.name), sub: s.paid ? `Đã trả ${num(s.paid)}` : "Chưa trả lần nào", much: num(s.owed), md: true })).join("")}</ul>` : `<p class="empty">Không còn nợ nhà cung cấp nào.</p>`}
       <ul class="ledger">${row({ what: `Đã trả tháng ${mo(paidM)}`, much: nccPaid ? num(nccPaid) : NONE, md: true })}</ul>
       ${clear.length ? `<h2 class="sec">Đã trả đủ</h2><ul class="ledger">${clear.map((s) => row({ href: `#/ncc/${enc(s.name)}`, what: esc(s.name), much: '<span class="stamp">ĐÃ TRẢ ĐỦ</span>', md: true, cls: "done" })).join("")}</ul>` : ""}`;
     }
@@ -878,7 +878,7 @@
       const clear = customerIds().map(customer).filter((c) => c.debt <= 0 && c.bought > 0);
       return head + `<h2 class="sec">Đang nợ <small>${ds.length} khách</small></h2>
       ${ds.length ? `<ul class="ledger">${ds.map((c) => {
-        return row({ href: `#/khach/${enc(c.id)}`, what: esc(c.name), sub: owedText(c), much: num(c.debt), md: true, cls: "alert" });
+        return row({ href: `#/khach/${enc(c.id)}`, what: esc(c.name), sub: owedText(c), much: num(c.debt), md: true });
       }).join("")}</ul>` : `<p class="empty">Không khách nào còn nợ.</p>`}
       ${clear.length ? `<h2 class="sec">Đã trả đủ</h2><ul class="ledger">${clear.map((c) => row({ href: `#/khach/${enc(c.id)}`, what: esc(c.name), much: '<span class="stamp">ĐÃ TRẢ ĐỦ</span>', md: true, cls: "done" })).join("")}</ul>` : ""}`;
     }
@@ -897,7 +897,7 @@
       ${!isOwner() ? "" : g.holder === "Chưa ghi"
         // Chưa biết ai cầm thì không xác nhận cả nhóm: hỏi từng khoản cho ra người cầm
         ? ""
-        : `<div class="actions"><button class="btn primary big stacked" data-action="handover" data-holder="${esc(g.holder)}"><span>${ICON.check}${g.items.length > 1 ? `Mẹ đã nhận cả ${g.items.length} khoản` : "Mẹ đã nhận khoản này"}</span><b>${money(g.total)}</b></button></div>
+        : `<div class="actions"><button class="btn primary stacked" data-action="handover" data-holder="${esc(g.holder)}"><span>${ICON.check}${g.items.length > 1 ? `Mẹ đã nhận cả ${g.items.length} khoản` : "Mẹ đã nhận khoản này"}</span><b>${money(g.total)}</b></button></div>
       ${g.items.length > 1 ? `<p class="note">Chạm từng dòng để xác nhận riêng khoản đó.</p>` : ""}`}
     `).join("") + (isOwner() ? "" : `<p class="info">${sync === "local" ? "Đưa tiền cho Mẹ xong, đưa máy cho Mẹ bấm “Mẹ đã nhận”." : "Đưa tiền cho Mẹ xong, Mẹ sẽ bấm “Mẹ đã nhận” trên điện thoại của Mẹ."}</p>`)
       : `<p class="empty">Tiền khách trả đã về tay Mẹ hết. Không ai đang cầm hộ.</p>`}
@@ -917,9 +917,9 @@
     const pays = [...s.pays].sort((a, b) => b.date.localeCompare(a.date));
     return band({
       title: esc(s.name), back: "#/tien/ncc", exact: true,
-      totals: total("Mình còn nợ", num(Math.max(0, s.owed)), `#/ncc/${enc(s.name)}`, s.owed > 0) + total("Đã trả", num(s.paid), `#/ncc/${enc(s.name)}`),
+      totals: total("Mình còn nợ", num(Math.max(0, s.owed)), `#/ncc/${enc(s.name)}`) + total("Đã trả", num(s.paid), `#/ncc/${enc(s.name)}`),
     }) + `
-    ${isOwner() && s.owed > 0 ? `<div class="actions"><a class="btn primary big" href="#/tien/tra/${enc(s.name)}">Ghi trả ${esc(s.name)}</a></div>` : ""}
+    ${isOwner() && s.owed > 0 ? `<div class="actions"><a class="btn primary" href="#/tien/tra/${enc(s.name)}">Ghi trả ${esc(s.name)}</a></div>` : ""}
     <h2 class="sec">Hàng đã nhập</h2>
     ${buys.length ? `<ul class="ledger">${buys.map((b) => row({ what: esc(b.what), sub: `${dm(b.date)} · ${num(b.qty)} ${esc(b.unit)}`, much: num(b.value), md: true })).join("")}</ul>` : `<p class="empty">Chưa nhập hàng của nơi này.</p>`}
     <h2 class="sec">Tiền đã trả</h2>
@@ -958,7 +958,7 @@
       </div>
       <div class="field"><label for="tra-date">Ngày trả</label>${dateIn(F, "date", "tra-date")}</div>
       ${errOf(F)}
-      <button class="btn primary big" type="submit">Lưu</button>
+      <button class="btn primary" type="submit">Lưu</button>
     </form>`;
   }
 
@@ -971,7 +971,7 @@
     return band({
       title: esc(c.name), back: "#/tien", exact: true,
       sub: [phone ? `<a href="tel:${esc(phone)}">${esc(phone)}</a>` : "", esc(c.info.address || "")].filter(Boolean).join(" · "),
-      totals: total("Còn nợ", c.debt > 0 ? num(c.debt) : "0", "#/khach/" + enc(id), c.debt > 0) + total("Đã trả", num(c.paid), "#/khach/" + enc(id)),
+      totals: total("Còn nợ", c.debt > 0 ? num(c.debt) : "0", "#/khach/" + enc(id)) + total("Đã trả", num(c.paid), "#/khach/" + enc(id)),
     }) + `
     <div class="actions two">
       <a class="btn primary" href="#/tien/ghi/${enc(id)}">Ghi tiền trả</a>
@@ -982,12 +982,12 @@
     ${c.trips.length ? `<ul class="ledger">${[...c.trips].reverse().map((t) => row({
       href: billHref(id, t.date), what: `Chuyến ${dm(t.date)}`,
       sub: `${num(sum(t.orders, (o) => o.cartons))} thùng<br>${itemsText(t.orders)}`,
-      much: num(t.owed > 0 ? t.owed : t.amount), muchSub: t.owed > 0 ? `${t.owed < t.amount ? `còn nợ, trên ${num(t.amount)}` : "chưa trả"} · ${daysSince(t.date)} ngày` : t.unhanded ? '<span class="stamp pen">CHƯA VỀ MẸ</span>' : '<span class="stamp">ĐÃ TRẢ</span>', md: true, cls: t.owed > 0 ? "alert" : "",
+      much: num(t.owed > 0 ? t.owed : t.amount), muchSub: t.owed > 0 ? `${t.owed < t.amount ? `còn nợ, trên ${num(t.amount)}` : "chưa trả"} · ${daysSince(t.date)} ngày` : t.unhanded ? '<span class="stamp pen">CHƯA VỀ MẸ</span>' : '<span class="stamp">ĐÃ TRẢ</span>', md: true,
     })).join("")}</ul>` : `<p class="empty">Chưa giao chuyến nào cho khách này.</p>`}
     <h2 class="sec">Tiền đã trả</h2>
     ${c.pays.length ? `<ul class="ledger">${[...c.pays].reverse().map((p) => row({
       what: dm(p.date) + " · " + payWay(p.method),
-      sub: (p.alloc && p.alloc.length && !p.void ? `${allocText(p)}<br>` : "") + (p.void ? '<span class="stamp grey">HỦY</span>' : p.handed ? (p.holder === "Tài khoản Mẹ" ? `<span class="stamp pen${fr(p.id)}">TÀI KHOẢN MẸ</span>` : `<span class="stamp${fr(p.id)}">ĐÃ NỘP MẸ</span>`) : `<span class="stamp red">${p.holder === "Chưa ghi" ? "CHƯA RÕ AI CẦM" : esc(p.holder.toUpperCase()) + " CẦM"}</span>`),
+      sub: (p.alloc && p.alloc.length && !p.void ? `${allocText(p)}<br>` : "") + (p.void ? '<span class="stamp grey">HỦY</span>' : p.handed ? (p.holder === "Tài khoản Mẹ" ? `<span class="stamp pen${fr(p.id)}">TÀI KHOẢN MẸ</span>` : `<span class="stamp${fr(p.id)}">ĐÃ NỘP MẸ</span>`) : `<span class="stamp pen">${p.holder === "Chưa ghi" ? "CHƯA RÕ AI CẦM" : esc(p.holder.toUpperCase()) + " CẦM"}</span>`),
       much: num(p.amount), md: true, cls: p.void ? "void" : "",
       action: isOwner() && !p.void ? `data-action="pay-menu" data-id="${p.id}"` : "",
     })).join("")}</ul>` : `<p class="empty">Khách này chưa trả lần nào.</p>`}
@@ -1014,7 +1014,7 @@
       <div class="field"><label for="k-phone">Điện thoại</label><input class="input" id="k-phone" name="phone" type="tel" inputmode="tel" autocomplete="off" value="${esc(fv(F, "phone", c ? c.phone : ""))}"></div>
       <div class="field"><label for="k-address">Địa chỉ</label><input class="input" id="k-address" name="address" autocomplete="off" value="${esc(fv(F, "address", c ? c.address : ""))}"></div>
       ${errOf(F)}
-      <button class="btn primary big" type="submit">Lưu</button>
+      <button class="btn primary" type="submit">Lưu</button>
     </form>`;
   }
 
@@ -1031,7 +1031,7 @@
   const allocText = (p) => (p.alloc && p.alloc.length ? `Trả cho chuyến ${p.alloc.map((a) => dm(a.date)).join(", ")}.` : "Trừ vào chuyến cũ nhất trước.");
   function allocNote(st) {
     const left = (st.amount || 0) - allocSum(st.alloc);
-    if (left < 0) return `<span class="due">Chia dư ${num(-left)}. Bớt lại cho bằng số tiền.</span>`;
+    if (left < 0) return `<b>Chia dư ${num(-left)}. Bớt lại cho bằng số tiền.</b>`;
     return left ? `Còn ${num(left)} chưa chia, sẽ trừ vào chuyến cũ nhất.` : allocSum(st.alloc) ? "Đã chia hết." : "";
   }
   function allocError(trips, st) {
@@ -1087,7 +1087,7 @@
         <input class="input" type="date" id="pay-date" name="date" value="${d.date}" max="${today()}">
       </div>` : `<div class="pay-day"><span>Hôm nay</span><button type="button" class="link" data-action="pay-date-open">Đổi ngày</button></div>`}
       ${d.error ? `<p class="warn" role="alert">${esc(d.error)}</p>` : ""}
-      <div class="save-bar"><button class="btn primary big block" type="submit">Lưu</button></div>
+      <div class="save-bar"><button class="btn primary block" type="submit">Lưu</button></div>
     </form>`;
   }
 
@@ -1102,7 +1102,7 @@
     <div class="form">
       ${trips.length ? allocRows(trips, chia) : `<p class="empty">Khách này không còn chuyến nào để trừ.</p>`}
       ${chia.error ? `<p class="warn" role="alert">${esc(chia.error)}</p>` : ""}
-      ${trips.length ? `<button class="btn primary big" data-action="chia-save" data-id="${p.id}">Lưu cách chia</button>` : ""}
+      ${trips.length ? `<button class="btn primary" data-action="chia-save" data-id="${p.id}">Lưu cách chia</button>` : ""}
     </div>`;
   }
 
@@ -1135,7 +1135,7 @@
           <button type="button" class="choice" data-action="sx-day" data-v="h" aria-pressed="${sx.day !== "y"}">Hôm nay</button>
           <button type="button" class="choice" data-action="sx-day" data-v="y" aria-pressed="${sx.day === "y"}">Hôm qua</button>
         </div>
-        ${dup.length ? `<p class="warn">${sx.day === "y" ? "Hôm qua" : "Hôm nay"} đã ghi ${num(sum(dup, (x) => x.cartons))} thùng loại này rồi${dup.some((x) => x.by) ? ` (${[...new Set(dup.map((x) => x.by).filter(Boolean))].map(esc).join(", ")})` : ""}.</p>` : ""}
+        ${dup.length ? `<p class="info">${sx.day === "y" ? "Hôm qua" : "Hôm nay"} đã ghi ${num(sum(dup, (x) => x.cartons))} thùng loại này rồi${dup.some((x) => x.by) ? ` (${[...new Set(dup.map((x) => x.by).filter(Boolean))].map(esc).join(", ")})` : ""}.</p>` : ""}
         <div class="stepper">
           <button type="button" data-action="sx-step" data-v="-1" aria-label="Bớt 1 thùng">${ICON.minus}</button>
           <input class="count-in" id="sx-n" inputmode="numeric" pattern="[0-9]*" autocomplete="off" aria-label="Số thùng" placeholder="0" value="${sx.cartons || ""}">
@@ -1143,7 +1143,7 @@
         </div>
         <div class="chips two">${[5, 10].map((n) => `<button type="button" class="chip" data-action="sx-step" data-v="${n}">+${n}</button>`).join("")}</div>
         ${p.group === "Dầu" ? `<p class="hint" id="sx-hint" aria-live="polite">${sxHint(p, sx.cartons)}</p>` : ""}
-        <div class="save-bar"><button class="btn primary big block" id="sx-save" data-action="sx-save" ${sx.cartons ? "" : "disabled"}>${sx.day === "y" ? `Lưu cho hôm qua, ${dm(yday())}` : "Lưu"}</button></div>
+        <div class="save-bar"><button class="btn primary block" id="sx-save" data-action="sx-save" ${sx.cartons ? "" : "disabled"}>${sx.day === "y" ? `Lưu cho hôm qua, ${dm(yday())}` : "Lưu"}</button></div>
       </div>`;
     }
 
@@ -1189,8 +1189,8 @@
   }
   function payNote(owed, value, unhanded, date) {
     if (owed <= 0) return unhanded ? '<span class="stamp pen">CHƯA VỀ MẸ</span>' : '<span class="stamp">ĐÃ TRẢ</span>';
-    const age = date && daysSince(date) ? ` · ${daysSince(date)} ngày` : "";
-    return `<span class="due">${owed < value ? `còn nợ ${num(owed)}` : "chưa trả"}${age}</span>`;
+    const age = date && daysSince(date) ? ` · ${daysSince(date)} ngày` : "";
+    return `<span>${owed < value ? `còn nợ ${num(owed)}` : "chưa trả"}${age}</span>`;
   }
 
   let donLimit = 30, donQ = "";
@@ -1219,10 +1219,10 @@
     const [mm] = monthPick((m) => all.filter((t) => t.date.slice(0, 7) === m).length), monthT = all.filter((t) => t.date.slice(0, 7) === mm);
     return band({
       title: "Đơn hàng",
-      totals: total(todayT.length ? `Hôm nay · ${todayT.length} đơn` : "Hôm nay", todayT.length ? short(sum(todayT, tripValue)) : NONE, "#/don", false)
-        + total(monthT.length ? `Tháng ${mo(mm)} · ${monthT.length} đơn` : `Tháng ${mo(mm)}`, monthT.length ? short(sum(monthT, tripValue)) : NONE, "#/don", false),
+      totals: total(todayT.length ? `Hôm nay · ${todayT.length} đơn` : "Hôm nay", todayT.length ? short(sum(todayT, tripValue)) : NONE, "#/don")
+        + total(monthT.length ? `Tháng ${mo(mm)} · ${monthT.length} đơn` : `Tháng ${mo(mm)}`, monthT.length ? short(sum(monthT, tripValue)) : NONE, "#/don"),
     }) + `
-    <div class="actions"><a class="btn primary big" href="#/don/moi">${ICON.plus}Lên đơn mới</a></div>
+    <div class="actions"><a class="btn primary" href="#/don/moi">${ICON.plus}Lên đơn mới</a></div>
     ${all.length > 6 ? `<div class="search"><label class="sr-only" for="don-q">Tìm đơn theo tên khách</label>
       <input class="input" id="don-q" type="search" autocomplete="off" placeholder="Tìm tên khách" value="${esc(donQ)}"></div>` : ""}
     <div id="don-list" aria-live="polite">${donList()}</div>`;
@@ -1276,8 +1276,8 @@
     const who = [...new Set(b.lines.map((o) => o.by).filter((x) => x && x !== "Excel"))];
     const phone = String((custById(id) || {}).phone || "").replace(/\D/g, "");
     const self = billHref(id, date);
-    const pay = b.owed <= 0 ? total(b.unhanded ? "Đã trả · chưa về tay Mẹ" : "Đã trả đủ", num(b.value), self, false)
-      : total(`${b.owed < b.value ? "Còn nợ" : "Chưa trả"} · ${daysSince(date) ? daysSince(date) + " ngày" : "hôm nay"}`, num(b.owed), self, true);
+    const pay = b.owed <= 0 ? total(b.unhanded ? "Đã trả · chưa về tay Mẹ" : "Đã trả đủ", num(b.value), self)
+      : total(`${b.owed < b.value ? "Còn nợ" : "Chưa trả"} · ${daysSince(date) ? daysSince(date) + " ngày" : "hôm nay"}`, num(b.owed), self);
     return band({
       title: esc(cname(id)), sub: `Hoá đơn ${wdMid(d)}, ${dmy(date)}`, back: "#/don", exact: true,
       totals: pay,
@@ -1291,14 +1291,14 @@
     <ul class="ledger">${b.paidFrom.map((f) => row({ what: `Tiền trả ngày ${dm(f.date)}`,
       sub: f.handed ? (f.holder === "Tài khoản Mẹ" ? '<span class="stamp pen">TÀI KHOẢN MẸ</span>' : '<span class="stamp">ĐÃ NỘP MẸ</span>') : f.holder === "Chưa ghi" ? "chưa rõ ai cầm" : `${esc(f.holder)} đang cầm`,
       much: num(f.amount), md: true })).join("")}
-      ${b.owed > 0 ? row({ what: "Còn nợ", much: num(b.owed), md: true, cls: "alert" }) : ""}</ul>` : ""}
-    ${b.owed > 0 ? `<div class="actions"><a class="btn primary big" href="#/tien/ghi/${enc(id)}">Ghi tiền trả</a></div>` : ""}
+      ${b.owed > 0 ? row({ what: "Còn nợ", much: num(b.owed), md: true }) : ""}</ul>` : ""}
+    ${b.owed > 0 ? `<div class="actions"><a class="btn primary" href="#/tien/ghi/${enc(id)}">Ghi tiền trả</a></div>` : ""}
     <div class="actions two">
       <button class="btn" data-action="bill-copy" data-c="${esc(id)}" data-d="${date}" ${phone ? `data-phone="${phone}"` : ""}>${phone ? "Gửi Zalo" : "Chép gửi Zalo"}</button>
       <a class="btn" href="#/khach/${enc(id)}">Sổ của khách</a>
     </div>
     ${who.length ? `<p class="note">Người ghi: ${who.map(esc).join(", ")}</p>` : ""}
-    ${isOwner() ? `<div class="actions"><button class="btn quiet" data-action="cancel-bill" data-c="${esc(id)}" data-d="${date}">Hủy hoá đơn này</button></div>` : ""}`;
+    ${isOwner() ? `<div class="actions"><button class="link" data-action="cancel-bill" data-c="${esc(id)}" data-d="${date}">Hủy hoá đơn này</button></div>` : ""}`;
   }
 
   // ---------- Trang: Lên đơn mới ----------
@@ -1387,7 +1387,7 @@
           ${customerIds().map((k) => `<option value="${esc(k)}">${esc(cname(k))}</option>`).join("")}
         </select>`}
       </div>
-      ${c && c.debt > 0 ? `<p class="warn">${esc(c.name)} còn nợ <b>${money(c.debt)}</b>${owed.length ? ` từ chuyến ${dm(owed[0].date)}` : ""}. Nhớ hỏi tiền chuyến trước.</p>` : ""}
+      ${c && c.debt > 0 ? `<p class="info">${esc(c.name)} còn nợ <b>${money(c.debt)}</b>${owed.length ? ` từ chuyến ${dm(owed[0].date)}` : ""}. Nhớ hỏi tiền chuyến trước.</p>` : ""}
       <div class="field">
         <div class="label-row"><span class="label">Số thùng</span>${isOwner() ? `<button type="button" class="link" data-action="od-edit-price" aria-pressed="${od.editPrice}">${od.editPrice ? "Xong sửa giá" : "Sửa giá"}</button>` : ""}</div>
         <div class="order-sheet">${head}${usual.map(orderRow).join("")}</div>
@@ -1429,7 +1429,7 @@
       <div class="field"><label for="vt-s">Mua của ai?</label><input class="input" id="vt-s" name="supplier" list="ds-ncc" autocomplete="off" value="${esc(fv(F, "supplier"))}">${supplierList()}</div>
       <div class="field"><label for="vt-d">Ngày nhập</label>${dateIn(F, "date", "vt-d")}</div>
       ${errOf(F)}
-      <button class="btn primary big" type="submit">Lưu</button>
+      <button class="btn primary" type="submit">Lưu</button>
     </form>
     <h2 class="sec">Lần nhập gần đây</h2>
     ${recent.length ? `<ul class="ledger">${recent.map((x) => { const mm = material(x.material) || {}; return row({
@@ -1449,7 +1449,7 @@
       <div class="field"><label for="dau-s">Mua của ai?</label><input class="input" id="dau-s" name="supplier" list="ds-ncc" autocomplete="off" value="${esc(fv(F, "supplier", last.supplier || ""))}">${supplierList()}</div>
       <div class="field"><label for="dau-d">Ngày nhập</label>${dateIn(F, "date", "dau-d")}</div>
       ${errOf(F)}
-      <button class="btn primary big" type="submit">Lưu</button>
+      <button class="btn primary" type="submit">Lưu</button>
     </form>
     <h2 class="sec">Các công đã nhập</h2>
     ${db.batches.length ? `<ul class="ledger">${[...db.batches].sort((a, b) => b.date.localeCompare(a.date)).map((b) => row({
@@ -1484,12 +1484,12 @@
       <div class="field"><label for="hh-r">Vì sao?</label><input class="input" id="hh-r" name="reason" autocomplete="off" value="${esc(fv(F, "reason"))}"></div>
       <div class="field"><label for="hh-d">Ngày</label>${dateIn(F, "date", "hh-d")}</div>
       ${errOf(F)}
-      <button class="btn primary big" type="submit">Lưu</button>
+      <button class="btn primary" type="submit">Lưu</button>
     </form>
     <h2 class="sec">Hao hụt gần đây</h2>
     ${recent.length ? `<ul class="ledger">${recent.map((l) => row({
       what: esc(lossName(l)), sub: l.void ? '<span class="stamp grey">HỦY</span>' : `${dm(l.date)}${l.reason ? " · " + esc(l.reason) : ""}`,
-      much: num(l.qty), muchSub: esc(lossUnit(l)), md: true, cls: l.void ? "void" : "alert", action: voidAct("losses", l),
+      much: num(l.qty), muchSub: esc(lossUnit(l)), md: true, cls: l.void ? "void" : "", action: voidAct("losses", l),
     })).join("")}</ul>` : `<p class="empty">Chưa ghi hao hụt nào.</p>`}`;
   }
   const lossName = (l) => (l.store === "NVL" ? matName(material(l.code)) || l.code : product(l.code) ? label(product(l.code), l.color || "") : l.code);
@@ -1513,21 +1513,21 @@
     const lm = months[0], lmOs = lm ? sold.filter((o) => monthOf(o.deliver || o.date) === lm) : [];
     const lmRev = sum(lmOs, orderValue), lmProfit = lmRev - sum(lmOs, costOf);
     return band({ title: "Báo cáo", back: "#/", exact: true,
-      totals: lm ? total(`Lãi tháng ${Number(lm.slice(5))}`, num(Math.round(lmProfit / 1000) * 1000), "#/baocao", lmProfit < 0) + total(`Bán tháng ${Number(lm.slice(5))}`, num(lmRev), "#/baocao") : "" }) + `
+      totals: lm ? total(`Lãi tháng ${Number(lm.slice(5))}`, num(Math.round(lmProfit / 1000) * 1000), "#/baocao") + total(`Bán tháng ${Number(lm.slice(5))}`, num(lmRev), "#/baocao") : "" }) + `
     <h2 class="sec">Lãi theo tháng</h2>
     ${months.length ? `<ul class="ledger">${months.map((m) => {
       const os = sold.filter((o) => monthOf(o.deliver || o.date) === m);
       const rev = sum(os, orderValue), profit = rev - sum(os, costOf);
-      return row({ what: `Tháng ${Number(m.slice(5))}/${m.slice(0, 4)}`, sub: `Bán ${num(rev)} · ${num(sum(os, (o) => o.cartons))} thùng`, much: num(Math.round(profit / 1000) * 1000), muchSub: "lãi", md: true, cls: profit < 0 ? "alert" : "" });
+      return row({ what: `Tháng ${Number(m.slice(5))}/${m.slice(0, 4)}`, sub: `Bán ${num(rev)} · ${num(sum(os, (o) => o.cartons))} thùng`, much: num(Math.round(profit / 1000) * 1000), muchSub: "lãi", md: true });
     }).join("")}</ul>` : `<p class="empty">Chưa bán được thùng nào.</p>`}
     <h2 class="sec">Theo loại hàng <small>30 ngày qua</small></h2>
-    ${byP.length ? `<ul class="ledger">${byP.map((x) => row({ what: esc(sxName(x.p)), sub: `Bán ${num(x.rev)} · ${num(x.cartons)} thùng`, much: num(Math.round((x.rev - x.cost) / 1000) * 1000), muchSub: "lãi", md: true, cls: x.rev - x.cost < 0 ? "alert" : "" })).join("")}</ul>` : `<p class="empty">30 ngày qua chưa bán được thùng nào.</p>`}
+    ${byP.length ? `<ul class="ledger">${byP.map((x) => row({ what: esc(sxName(x.p)), sub: `Bán ${num(x.rev)} · ${num(x.cartons)} thùng`, much: num(Math.round((x.rev - x.cost) / 1000) * 1000), muchSub: "lãi", md: true })).join("")}</ul>` : `<p class="empty">30 ngày qua chưa bán được thùng nào.</p>`}
     <h2 class="sec">Lãi mỗi thùng <small>giá bán trừ giá vốn</small></h2>
     <ul class="ledger">${db.products.filter((p) => !neverMade(p)).map((p) => {
       const c = unitCost(p), m = p.price - c.total;
       const r = (n) => Math.round(n / 100) * 100;
       return row({ what: esc(sxName(p)), sub: c.hasBom ? `Vốn ${num(r(c.total))} · bán ${num(p.price)}` : "Chưa có định mức vật tư",
-        much: c.hasBom ? num(r(m)) : "—", muchSub: c.hasBom && p.price ? `${Math.round((m / p.price) * 100)}%` : "", md: true, cls: c.hasBom && m < 0 ? "alert" : "" });
+        much: c.hasBom ? num(r(m)) : "—", muchSub: c.hasBom && p.price ? `${Math.round((m / p.price) * 100)}%` : "", md: true });
     }).join("")}</ul>
     ${oil ? `<p class="note">Giá vốn tính theo giá dầu công ${esc(oil.code)} (${num(oil.pricePerKg)} ₫/kg) và giá vật tư lần nhập gần nhất.</p>` : ""}`;
   }
@@ -1571,18 +1571,18 @@
     const all = p.method === "CK" ? CK_HOLDERS : p.method === "TM" ? PEOPLE : [...PEOPLE, "Tài khoản Mẹ"];
     const opts = unk ? all : all.filter((h) => !WITH_OWNER.includes(h) && (h !== p.holder || OTHER.includes(h)));
     const pick = (h) => WITH_OWNER.includes(h)
-      ? `<button class="btn big" data-action="recv-yes" data-id="${p.id}" data-v="${esc(h)}">${h === OWNER ? "Mẹ đã nhận" : "Tài khoản Mẹ"}</button>`
-      : OTHER.includes(h) ? `<button class="btn big" data-action="recv-other" data-id="${p.id}" data-v="${esc(h)}">${h === "Người khác" ? "Người khác…" : "Tài khoản khác…"}</button>`
-      : `<button class="btn big" data-action="recv-holder" data-id="${p.id}" data-v="${esc(h)}">${esc(h)}</button>`;
+      ? `<button class="btn" data-action="recv-yes" data-id="${p.id}" data-v="${esc(h)}">${h === OWNER ? "Mẹ đã nhận" : "Tài khoản Mẹ"}</button>`
+      : OTHER.includes(h) ? `<button class="btn" data-action="recv-other" data-id="${p.id}" data-v="${esc(h)}">${h === "Người khác" ? "Người khác…" : "Tài khoản khác…"}</button>`
+      : `<button class="btn" data-action="recv-holder" data-id="${p.id}" data-v="${esc(h)}">${esc(h)}</button>`;
     const multi = walk && walk.total > 1;
     sheet(`<h2 id="sheet-title">${esc(cname(cidOf(p)))} · ${money(p.amount)}</h2>
       ${walk && walk.last ? `<p class="just">${esc(walk.last.msg)} <button class="link" data-action="walk-undo">Ghi nhầm</button></p>` : ""}
       <p>${multi ? `Khoản ${walk.done + 1}/${walk.total} · ` : ""}Ngày ${dm(p.date)} · ${payWay(p.method)}${unk ? "" : ` · ${esc(p.holder)} đang cầm`}.</p>
-      ${unk ? "" : `<button class="btn big block primary" data-action="recv-yes" data-id="${p.id}">${ICON.check}Mẹ đã nhận khoản này</button>`}
+      ${unk ? "" : `<button class="btn block primary" data-action="recv-yes" data-id="${p.id}">${ICON.check}Mẹ đã nhận khoản này</button>`}
       ${opts.length ? `<p class="ask" id="recv-ask">${unk ? "Ai đang cầm khoản này?" : "Hoặc ghi lại người đang cầm"}</p>
       <div class="choices two" role="group" aria-labelledby="recv-ask">${opts.map(pick).join("")}</div>` : ""}
       <div class="sheet-links"><button class="link" data-action="go-close" data-v="#/khach/${enc(cidOf(p))}">Xem sổ của khách</button>
-      <button class="link soft" data-action="sheet-no">${multi ? "Để sau" : "Thôi"}</button></div>`);
+      <button class="link" data-action="sheet-no">${multi ? "Để sau" : "Thôi"}</button></div>`);
   }
   // Hỏi tên người cầm: gõ mới hoặc chọn tên đã ghi trước đây
   function otherSheet(p, kind) {
@@ -1593,13 +1593,13 @@
       <label class="sr-only" for="other-name">Tên người cầm</label>
       <input class="input" id="other-name" autocomplete="off" maxlength="40" placeholder="Gõ tên">
       <p class="warn" id="other-err" role="alert" tabindex="-1" hidden>Chưa có tên. Gõ tên người đang cầm tiền.</p>
-      <button class="btn big block primary" data-action="recv-other-save" data-id="${p.id}" data-k="${esc(kind)}">Lưu tên này</button>
-      <div class="sheet-links"><span></span><button class="link soft" data-action="sheet-no">Thôi</button></div>`);
+      <button class="btn block primary" data-action="recv-other-save" data-id="${p.id}" data-k="${esc(kind)}">Lưu tên này</button>
+      <div class="sheet-links"><span></span><button class="link" data-action="sheet-no">Thôi</button></div>`);
     const box = bg.querySelector("#other-name");
     box.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); bg.querySelector('[data-k]').click(); } });
   }
   function whoSheet() {
-    const sizes = `<h2 id="size-title" style="margin-top:12px">Cỡ chữ</h2>
+    const sizes = `<h2 id="size-title" class="sheet-sub">Cỡ chữ</h2>
       <div class="size-pick" role="group" aria-labelledby="size-title">
         ${SIZES.map((s, i) => `<button type="button" class="choice" data-action="set-size" data-v="${i}" aria-pressed="${(db.meta.textSize || 0) === i}">${s.label}</button>`).join("")}
       </div>`;
@@ -1607,18 +1607,18 @@
       sheet(`<h2 id="sheet-title">${esc(who.name)}</h2>
         <p>${isOwner() ? "Máy này đang dùng tài khoản của Mẹ, nên có đủ quyền của Mẹ." : "App sẽ nhớ ai đã ghi từng dòng."}</p>
         ${sizes}
-        <button class="btn big block" data-action="sign-out" style="margin-top:12px">Đăng xuất</button>
-        <div class="sheet-links"><span></span><button class="link soft" data-action="sheet-no">Đóng</button></div>`);
+        <button class="btn block" data-action="sign-out">Đăng xuất</button>
+        <div class="sheet-links"><span></span><button class="link" data-action="sheet-no">Đóng</button></div>`);
       return;
     }
     sheet(`<h2 id="sheet-title">Ai đang dùng máy này?</h2><p>App sẽ nhớ ai đã ghi từng dòng.</p>
-      ${people().map((p) => `<button class="btn big block ${p === me() ? "primary" : ""}" data-action="set-user" data-v="${esc(p)}" aria-pressed="${p === me()}">${esc(p)}</button>`).join("")}
+      ${people().map((p) => `<button class="btn block ${p === me() ? "primary" : ""}" data-action="set-user" data-v="${esc(p)}" aria-pressed="${p === me()}">${esc(p)}</button>`).join("")}
       ${sizes}`);
   }
-  function confirmSheet(title, text, yesLabel, onYes, danger, noLabel = "Thôi, không làm") {
+  function confirmSheet(title, text, yesLabel, onYes, _danger, noLabel = "Thôi, không làm") {
     sheet(`<h2 id="sheet-title">${title}</h2><p>${text}</p>
-      <button class="btn big block ${danger ? "danger" : "primary"}" data-action="sheet-yes">${yesLabel}</button>
-      <button class="btn big block" data-action="sheet-no">${noLabel}</button>`);
+      <button class="btn block primary" data-action="sheet-yes">${yesLabel}</button>
+      <button class="btn block" data-action="sheet-no">${noLabel}</button>`);
     pendingYes = onYes;
   }
   let pendingYes = null;
@@ -1679,7 +1679,10 @@
       let fs = parseFloat(getComputedStyle(el).fontSize);
       // Số canh phải nên tràn sang trái, scrollWidth không thấy: đo cả mép trái
       const pad = parseFloat(getComputedStyle(el).paddingLeft) || 0;
-      const over = () => el.scrollWidth > el.clientWidth + 1 || (el.firstElementChild && el.firstElementChild.getBoundingClientRect().left < el.getBoundingClientRect().left + pad - 1);
+      // Con dấu dưới số được xuống dòng nên không đẩy ô rộng ra: đo riêng phần chữ số so với chỗ còn lại
+      const stack = el.querySelector(".stack"), fig = stack && stack.firstElementChild;
+      const figWide = () => { if (!fig) return false; const r = document.createRange(); r.selectNodeContents(fig); return r.getBoundingClientRect().width > stack.clientWidth + 1; };
+      const over = () => el.scrollWidth > el.clientWidth + 1 || figWide() || (el.firstElementChild && el.firstElementChild.getBoundingClientRect().left < el.getBoundingClientRect().left + pad - 1);
       while (over() && fs > 16) { fs -= 1; el.style.fontSize = fs + "px"; }
     });
   }
@@ -1715,6 +1718,13 @@
   });
 
   // ---------- Thao tác ----------
+  // Ô đang gõ không được nằm khuất sau thanh Lưu dính ở đáy
+  document.addEventListener("focusin", (e) => {
+    const t = e.target, bar = t.closest && t.matches("input, select, textarea") && t.closest("form")?.querySelector(".od-bar, .save-bar");
+    if (!bar || bar.contains(t)) return;
+    const hidden = t.getBoundingClientRect().bottom + 12 - bar.getBoundingClientRect().top;
+    if (hidden > 0) window.scrollBy(0, hidden);
+  });
   document.addEventListener("input", (e) => {
     const t = e.target;
     const f = t.closest && t.closest("form[data-form]");
@@ -1888,7 +1898,7 @@
     const show = () => {
       const bg = sheet(`<h2 id="sheet-title">Chép hoá đơn</h2><p>Bấm giữ vào chữ, chọn “Chép”, rồi dán vào Zalo.</p>
         <textarea class="input copy-box" readonly rows="10"></textarea>
-        <button class="btn big block" data-action="sheet-no">Xong</button>`);
+        <button class="btn block" data-action="sheet-no">Xong</button>`);
       const ta = bg.querySelector("textarea"); ta.value = text; ta.focus(); ta.select();
     };
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(ok, show); else show();
@@ -1975,9 +1985,9 @@
         const p = db.payments.find((x) => x.id === id); if (!p || p.holder !== "Chưa ghi" || p.handed) break;
         sheet(`<h2 id="sheet-title">${esc(cname(cidOf(p)))} · ${money(p.amount)}</h2>
           <p>Ngày ${dm(p.date)} · ${payWay(p.method)} · chưa rõ ai cầm.</p>
-          <button class="btn big block primary" data-action="claim-yes" data-id="${p.id}">Tôi đang cầm khoản này</button>
+          <button class="btn block primary" data-action="claim-yes" data-id="${p.id}">Tôi đang cầm khoản này</button>
           <div class="sheet-links"><button class="link" data-action="go-close" data-v="#/khach/${enc(cidOf(p))}">Xem sổ của khách</button>
-          <button class="link soft" data-action="sheet-no">Thôi</button></div>`);
+          <button class="link" data-action="sheet-no">Thôi</button></div>`);
         break;
       }
       case "claim-yes": {
@@ -2012,9 +2022,9 @@
         const c = customer(cidOf(p));
         sheet(`<h2 id="sheet-title">${esc(cname(cidOf(p)))} · ${money(p.amount)}</h2>
           <p>Ngày ${dm(p.date)} · ${payWay(p.method)}. ${allocText(p)}</p>
-          ${c.trips.length ? `<button class="btn big block" data-action="go-chia" data-v="${p.id}">Chọn chuyến cho khoản này</button>` : ""}
-          <div class="sheet-links"><button class="link danger" data-action="pay-void" data-id="${p.id}">Hủy khoản này</button>
-          <button class="link soft" data-action="sheet-no">Thôi</button></div>`);
+          ${c.trips.length ? `<button class="btn block" data-action="go-chia" data-v="${p.id}">Chọn chuyến cho khoản này</button>` : ""}
+          <div class="sheet-links"><button class="link" data-action="pay-void" data-id="${p.id}">Hủy khoản này</button>
+          <button class="link" data-action="sheet-no">Thôi</button></div>`);
         break;
       }
       case "pay-void": {

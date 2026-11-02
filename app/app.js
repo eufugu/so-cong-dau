@@ -1769,6 +1769,10 @@
   document.addEventListener("input", (e) => {
     const t = e.target;
     const f = t.closest && t.closest("form[data-form]");
+    // Có máy chỉ báo "change" khi rời ô ngày: đủ ngày là đổi chữ ngay, không phải chờ
+    if ((t.id === "od-date" || t.id === "pay-date") && /^\d{4}-\d{2}-\d{2}$/.test(t.value)) {
+      if (t.id === "od-date") od.date = pickDate(t); else payDraft.date = pickDate(t);
+    }
     // Tìm khách: chỉ vẽ lại danh sách, ô tìm giữ nguyên
     if (t.dataset.pick) {
       (t.dataset.pick === "od-cust" ? od : payDraft).q = t.value;

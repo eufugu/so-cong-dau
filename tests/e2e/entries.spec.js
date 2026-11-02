@@ -328,14 +328,20 @@ test('editing an old row offline is blocked with a message; online it works', as
   await expect.poll(async () => (await getDocs('payments'))[0].holder).toBe('Bác Khang');
 });
 
-test('Hôm nay: revenue instead of debt, a calm money row, tap opens the money page', async ({ page }) => {
-  const day = new Date(), d = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
+test('Hôm nay: revenue instead of debt, a calm money row, tap opens the money page', async ({ page, browser, baseURL }) => {
+  const day = new Date(), d =`${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
   await putDoc('orders', 'o-nay', { id: 'o-nay', date: d, deliver: d, customerId: CUST.id, customer: CUST.name, product: 'DAU-0.5', color: 'Đỏ', cartons: 2, price: 360000, status: 'Đã giao', by: 'Excel', void: false });
   await putDoc('payments', 'p-giu', { id: 'p-giu', date: d, customerId: CUST.id, customer: CUST.name, amount: 300000, method: 'TM', holder: WORKER.name, handed: false, handedDate: null, by: WORKER.name, void: false });
+  const mom = await otherPhone(browser, baseURL, OWNER);
+  await expect(mom.page.locator('.rev-total')).toContainText(`Doanh thu tháng ${day.getMonth() + 1}`);
+  await expect(mom.page.locator('.rev-total b')).toHaveText('720.000');
+  await expect(mom.page.locator('.rev svg rect')).toHaveCount(1);
+  await expect(mom.page.locator('main')).not.toContainText(/nợ/i);
+  await expect(mom.page.getByRole('link', { name: /Ghi sản xuất/ })).toBeVisible();
+  await expect(mom.page.locator('.row.plain')).toContainText('Còn 1 khoản tiền chưa đưa Mẹ');
+  await mom.ctx.close();
+
   await openAs(page, WORKER);
-  await expect(page.locator('.rev-total')).toContainText(`Doanh thu tháng ${day.getMonth() + 1}`);
-  await expect(page.locator('.rev-total b')).toHaveText('720.000');
-  await expect(page.locator('.rev svg rect')).toHaveCount(1);
   await expect(page.locator('main')).not.toContainText(/nợ/i);
   await expect(page.getByRole('link', { name: /Ghi sản xuất/ })).toBeVisible();
   const row = page.locator('.row.plain');

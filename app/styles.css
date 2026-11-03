@@ -41,6 +41,20 @@
   /* Màu miếng bánh, theo loại hàng: lấy từ hình mẫu của chủ (xanh ngọc, xanh thép, xanh bạc hà, xanh nõn chuối) và các sắc đậm nhạt của chúng */
   --pie-1: #0f7f5c; --pie-2: #7cc8e0; --pie-3: #7edf21; --pie-4: #104977; --pie-5: #00cd9a; --pie-6: #4f7cab; --pie-7: #12a0c2;
   --pie-8: #b4ec74; --pie-9: #80e6cc; --pie-10: #a7bfd8; --pie-11: #065a67; --pie-12: #5a9a0e;
+  /* Mỗi màu ba sắc: màu gốc cho mặt trên, -side cho thành ngoài, -dark cho thành trong và đầu cắt */
+  --pie-1-side: #126c51; --pie-1-dark: #165342;
+  --pie-2-side: #69a6ba; --pie-2-dark: #517a8a;
+  --pie-3-side: #6bb922; --pie-3-dark: #528722;
+  --pie-4-side: #134166; --pie-4-dark: #173651;
+  --pie-5-side: #06aa82; --pie-5-dark: #0e7d64;
+  --pie-6-side: #456990; --pie-6-dark: #39516d;
+  --pie-7-side: #1586a2; --pie-7-dark: #186579;
+  --pie-8-side: #96c364; --pie-8-dark: #6f8e4f;
+  --pie-9-side: #6dbeaa; --pie-9-dark: #538a7f;
+  --pie-10-side: #8c9fb4; --pie-10-dark: #687585;
+  --pie-11-side: #0b4e5a; --pie-11-dark: #123f48;
+  --pie-12-side: #4e8112; --pie-12-dark: #3f6118;
+  --pie-floor: #000;
   --check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 5 5 9-10'/%3E%3C/svg%3E");
   --r: 10px;
   --tap: 56px;
@@ -499,27 +513,24 @@ button[aria-pressed="true"]::before, .picked button::before {
 .pie-detail strong { font-size: 1.1rem; font-weight: 700; line-height: 1.25; }
 .pie-detail .pie-money { color: var(--pen); font-size: 1.25rem; font-weight: 700; line-height: 1.2; }
 .pie-detail small { color: var(--ink-2); font-size: 0.9rem; font-weight: 500; }
-.pie-detail .pie-hint { color: var(--ink-2); font-size: 0.95rem; text-align: center; }
 #pie { margin: 0 16px; touch-action: pan-y; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
-#pie svg { display: block; width: 100%; max-width: 440px; margin: 0 auto; height: auto; overflow: visible; }
-.slice { cursor: pointer; transition: transform .24s cubic-bezier(.16,1,.3,1); }
-.slice.on { transform: translate(var(--dx), var(--dy)); }
-.pie-out, .pie-in, .pie-cut { fill: var(--c); stroke: var(--c); stroke-width: .6; stroke-linejoin: round; }
-/* Mặt trên có viền cùng màu cực mảnh để khép khe giữa mặt và thành, mép bánh trơn */
-.pie-top { fill: var(--c); stroke: var(--c); stroke-width: .6; stroke-linejoin: round; }
-.pie-shade { fill: var(--ink); opacity: .18; stroke: none; pointer-events: none; }
-.pie-in-shade { opacity: .48; }
-.pie-cut-shade { opacity: .32; }
-.pie-cut, .pie-cut-shade { display: none; }
-.slice.on .pie-cut, .slice.on .pie-cut-shade { display: inline; }
-.pie-pct { fill: var(--paper); font-size: 0.85rem; font-weight: 700; text-anchor: middle; pointer-events: none; }
-.pie-pct.ink { fill: var(--ink); }
+/* Cả bánh thu lại, giữ nguyên tỉ lệ, để danh sách bên dưới lên được màn hình */
+#pie svg { display: block; width: 100%; max-width: 270px; margin: 0 auto; height: auto; overflow: visible; }
+/* Viền cùng màu với mặt để che khe giữa các mảnh */
+.pie-part { stroke-width: .8; stroke-linejoin: round; cursor: pointer; }
+.pie-shadow { fill: var(--pie-floor); pointer-events: none; }
+.pie-badge { pointer-events: none; }
+.pie-badge circle { fill: none; stroke: var(--paper); stroke-width: 2; }
+/* Hình thu nhỏ còn gần 0,8 lần nên chữ đặt to hơn để trên màn hình vẫn đủ 0,85rem */
+.pie-badge text { fill: var(--paper); font-size: 1.08rem; font-weight: 700; text-anchor: middle; }
 .pie-legend { list-style: none; margin: 8px 16px 0; padding: 0; }
 .pie-legend li + li { border-top: 1px solid var(--line); }
 .pie-key { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; padding: 4px 8px; border: 0; border-radius: var(--r); background: none; color: inherit; text-align: left; font-weight: 600; }
-.pie-key span:nth-child(2) { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.pie-key span:nth-child(3) { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.pie-no { flex: none; font-weight: 700; }
+.pie-share { flex: none; color: var(--ink-2); font-size: 0.9rem; font-weight: 500; }
+.pie-key[aria-pressed="true"] .pie-share { color: var(--paper); }
 .pie-key b { color: var(--pen); font-weight: 700; white-space: nowrap; }
 .pie-swatch { flex: none; width: 18px; height: 18px; border-radius: 4px; background: var(--c); border: 2px solid var(--paper); box-sizing: content-box; }
 .pie-key[aria-pressed="true"]::before { content: none; }
 .pie-key[aria-pressed="true"] b { color: var(--paper); }
-@media (prefers-reduced-motion: reduce) { .slice { transition: none; } }

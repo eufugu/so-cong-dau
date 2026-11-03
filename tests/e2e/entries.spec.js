@@ -513,27 +513,32 @@ test('Báo cáo: month picker, the two cards, press a slice to read it, and a fr
   await expect(page.locator('.total').first()).toContainText('1.000.000');
   await expect(page.locator('.total').nth(1)).toContainText('Lợi nhuận');
   // Doanh thu cao nhất trước; miếng lớn nhất được nhấc sẵn
-  await expect(page.locator('.pie-key span:nth-child(2)')).toHaveText(['1L', 'Hoa sen']);
+  await expect(page.locator('.pie-no')).toHaveText(['01', '02']);
+  await expect(page.locator('.pie-key span:nth-child(3)')).toHaveText(['1L', 'Hoa sen']);
+  await expect(page.locator('.pie-badge text')).toHaveText(['01', '02']);
+  await expect(page.locator('.pie-share')).toHaveText(['90%', '10%']);
+  await expect(page.getByRole('heading', { name: `Theo loại hàng · Tháng ${Number(lastM.slice(5))}` })).toBeVisible();
+  await expect(page.locator('.pie-pct')).toHaveCount(0);
   await expect(page.locator('.pie-key b')).toHaveText(['900.000', '100.000']);
-  await expect(page.locator('[data-slice="DAU-0.5"]')).toHaveClass(/on/);
+  await expect(page.locator('#pie svg')).toHaveAttribute('data-on', 'DAU-0.5');
   await expect(page.locator('#pie-detail')).toContainText('90% doanh thu · 3 thùng');
   await expect(page.locator('main')).not.toContainText('Lãi theo tháng');
   await expect(page.locator('main')).not.toContainText('Lãi mỗi thùng');
   await expect(page.locator('main')).not.toContainText('Giá vốn tính');
-  // Nhấn lên chính miếng bánh
-  const at = await page.locator('[data-slice="DAU-HS"] .pie-pct').evaluate((t) => { const r = t.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
-  await page.mouse.move(at.x, at.y);
-  await page.mouse.down();
-  await expect(page.locator('[data-slice="DAU-HS"]')).toHaveClass(/on/);
+  // Chạm lên chính miếng bánh: miếng được chọn nhấc lên nguyên khối, số đi theo, có bóng dưới sàn
+  const badgeY = () => page.locator('.pie-badge circle').nth(1).evaluate((c) => Number(c.getAttribute('cy')));
+  const before = await badgeY();
+  await page.locator('.pie-badge circle').nth(1).evaluate((c) => c.getBoundingClientRect()).then((r) => page.mouse.click(r.x + r.width / 2, r.y + r.height / 2));
+  await expect(page.locator('#pie svg')).toHaveAttribute('data-on', 'DAU-HS');
   await expect(page.locator('#pie-detail')).toContainText('100.000');
   await expect(page.locator('#pie-detail')).toContainText('10% doanh thu · 1 thùng');
-  await page.mouse.up();
-  await expect(page.locator('[data-slice="DAU-HS"]')).toHaveClass(/on/);
-  await expect(page.locator('.slice.on')).toHaveCount(1);
+  await expect.poll(async () => before - (await badgeY())).toBeGreaterThan(25);
+  await expect.poll(() => page.locator('.pie-shadow:not([display])').count()).toBe(1);
   // Hàng chú giải cũng chọn được, không cần chạm trúng miếng nhỏ
   await page.locator('.pie-key', { hasText: '1L' }).click();
   await expect(page.locator('#pie-detail')).toContainText('90% doanh thu · 3 thùng');
-  await expect(page.locator('.slice.on')).toHaveCount(1);
+  await expect(page.locator('#pie svg')).toHaveAttribute('data-on', 'DAU-0.5');
+  await expect.poll(() => page.locator('.pie-shadow:not([display])').count()).toBe(1);
 });
 
 test('the font comes from the app itself, never from another site', async ({ page }) => {

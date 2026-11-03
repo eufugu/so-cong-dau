@@ -1537,11 +1537,10 @@
   // ---------- Trang: Báo cáo (chỉ Mẹ) ----------
   const monthOf = (s) => s.slice(0, 7);
   const costOf = (o) => o.cartons * unitCost(product(o.product) || {}).total;
-  // Màu đi theo loại hàng, không theo thứ hạng, nên lọc tháng nào một loại vẫn một màu. Mỗi loại: [ô màu, chữ tối trên miếng sáng].
-  const PIE = { "DAU-0.5": [1, 0], "DAU-0.6": [2, 1], "DAU-0.8": [3, 1], "DAU-1": [4, 0], "DAU-1.3": [5, 1], "DAU-1.5": [6, 0], "DAU-HS": [7, 1],
-    "DAU-1.1": [8, 1], "DAU-1.2": [9, 1], "DAU-1.4": [10, 1], "NEN-TL": [11, 0], "NEN-SH": [12, 1] };
-  // slice: chưa chọn gì thì nhấc sẵn miếng lớn nhất; null là người dùng đã đặt xuống
-  let bc = { month: null, slice: undefined }, pieNow = [];
+  // Màu đi theo loại hàng, không theo thứ hạng, nên lọc tháng nào một loại vẫn một màu.
+  const PIE = { "DAU-0.5": 1, "DAU-0.6": 2, "DAU-0.8": 3, "DAU-1": 4, "DAU-1.3": 5, "DAU-1.5": 6, "DAU-HS": 7, "DAU-1.1": 8, "DAU-1.2": 9, "DAU-1.4": 10, "NEN-TL": 11, "NEN-SH": 12 };
+  // slice: loại đang chọn; chưa chọn thì là loại doanh thu cao nhất
+  let bc = { month: null, slice: null }, pieNow = [];
   const bcMonth = () => bc.month || today().slice(0, 7);
   const monthText = (m) => `${Number(m.slice(5))}/${m.slice(0, 4)}`;
   // Các tháng có bán, mới nhất trước; tháng này luôn có để quay về
@@ -1550,62 +1549,138 @@
   function pieSlices(orders) {
     const rows = db.products.map((p) => {
       const os = orders.filter((o) => o.product === p.code);
-      return { code: p.code, name: sxName(p), rev: sum(os, orderValue), cartons: sum(os, (o) => o.cartons), tone: PIE[p.code] || [8, 1] };
+      return { code: p.code, name: sxName(p), rev: sum(os, orderValue), cartons: sum(os, (o) => o.cartons), tone: PIE[p.code] || 8 };
     }).filter((x) => x.rev > 0).sort((a, b) => b.rev - a.rev);
     const all = sum(rows, (x) => x.rev);
-    let a = -Math.PI / 2;
-    return rows.map((x) => {
-      const share = x.rev / all, from = a, to = a + share * 2 * Math.PI - (share > 0.9995 ? 0.002 : 0);
-      a += share * 2 * Math.PI;
-      return { ...x, share, from, to, pct: share < 0.005 ? "<1" : String(Math.round(share * 100)) };
+    // Miếng nhỏ vẫn được vẽ rộng ít nhất 8° để nhìn thấy; phần trăm ghi vẫn là số thật
+    const MIN = 8, drawn = new Map();
+    let small = [];
+    for (;;) {
+      const big = rows.filter((x) => !small.includes(x)), room = 360 - small.length * MIN, base = sum(big, (x) => x.rev);
+      const more = big.filter((x) => (x.rev / base) * room < MIN);
+      if (!more.length || big.length === more.length) { rows.forEach((x) => drawn.set(x, small.includes(x) ? MIN : (x.rev / base) * room)); break; }
+      small = [...small, ...more];
+    }
+    let a = 180;  // bắt đầu từ bên trái, đi theo chiều kim đồng hồ, góc tính bằng độ
+    return rows.map((x, i) => {
+      const share = x.rev / all, from = a, to = a + drawn.get(x);
+      a = to;
+      return { ...x, no: String(i + 1).padStart(2, "0"), share, from, to, mid: (from + to) / 2, pct: share < 0.005 ? "<1" : String(Math.round(share * 100)) };
     });
   }
-  // Bánh vòng nổi: mặt trên là vành elip; thành ngoài thấy ở nửa trước, thành trong thấy ở nửa sau qua lỗ giữa
-  const PIE_BOX = { w: 343, h: 240, cx: 171.5, cy: 102, rx: 150, ry: 84, depth: 38, hole: 0.44 };
-  function pieSvg(slices, active) {
-    const { w, h, cx, cy, rx, ry, depth, hole } = PIE_BOX, irx = rx * hole, iry = ry * hole;
-    const out = (t, dz = 0) => `${(cx + rx * Math.cos(t)).toFixed(1)} ${(cy + ry * Math.sin(t) + dz).toFixed(1)}`;
-    const inn = (t, dz = 0) => `${(cx + irx * Math.cos(t)).toFixed(1)} ${(cy + iry * Math.sin(t) + dz).toFixed(1)}`;
-    const arcOut = (t, big, sweep, dz = 0) => `A${rx} ${ry} 0 ${big ? 1 : 0} ${sweep} ${out(t, dz)}`;
-    const arcIn = (t, big, sweep, dz = 0) => `A${irx.toFixed(1)} ${iry.toFixed(1)} 0 ${big ? 1 : 0} ${sweep} ${inn(t, dz)}`;
-    const wallOut = (a, b) => `M${out(a)} ${arcOut(b, b - a > Math.PI, 1)} L${out(b, depth)} ${arcOut(a, b - a > Math.PI, 0, depth)} Z`;
-    const wallIn = (a, b) => `M${inn(a)} ${arcIn(b, b - a > Math.PI, 1)} L${inn(b, depth)} ${arcIn(a, b - a > Math.PI, 0, depth)} Z`;
-    const cut = (t) => `M${inn(t)} L${out(t)} L${out(t, depth)} L${inn(t, depth)} Z`;
-    const shaded = (cls, d, extra = "") => `<path class="${cls}" d="${d}"${extra}/><path class="${cls}-shade pie-shade" d="${d}"${extra}/>`;
-    const clip = ' clip-path="url(#pie-hole)"';
-    const piece = (x) => {
-      const mid = (x.from + x.to) / 2, big = x.to - x.from > Math.PI;
-      const f0 = Math.max(x.from, 0), f1 = Math.min(x.to, Math.PI);
-      // Nửa sau của lỗ: góc từ -90° tới 0° và từ 180° tới 270°
-      const back = [[Math.max(x.from, -Math.PI / 2), Math.min(x.to, 0)], [Math.max(x.from, Math.PI), Math.min(x.to, 1.5 * Math.PI)]].filter(([a, b]) => b > a);
-      const lx = cx + rx * 0.72 * Math.cos(mid), ly = cy + ry * 0.72 * Math.sin(mid) + 5;
-      return `<g class="slice${x.code === active ? " on" : ""}" data-slice="${x.code}" style="--c:var(--pie-${x.tone[0]});--dx:${(Math.cos(mid) * 14).toFixed(1)}px;--dy:${(Math.sin(mid) * 10 - 10).toFixed(1)}px">
-        ${back.map(([a, b]) => shaded("pie-in", wallIn(a, b), clip)).join("")}
-        ${shaded("pie-cut", cut(x.from))}${shaded("pie-cut", cut(x.to))}
-        ${f1 > f0 ? shaded("pie-out", wallOut(f0, f1)) : ""}
-        <path class="pie-top" d="M${out(x.from)} ${arcOut(x.to, big, 1)} L${inn(x.to)} ${arcIn(x.from, big, 0)} Z"/>
-        ${x.share >= 0.06 ? `<text class="pie-pct${x.tone[1] ? " ink" : ""}" x="${lx.toFixed(1)}" y="${ly.toFixed(1)}">${x.pct}%</text>` : ""}
-      </g>`;
+  // Bánh vòng nổi. Mọi miếng cao bằng nhau; miếng đang chọn được nhấc nguyên khối lên và đẩy ra ngoài một chút, để lại bóng dưới sàn.
+  // Mỗi miếng được cắt ở các bội của 90°, rồi mọi mảnh xếp theo sin của góc giữa và vẽ từ sau ra trước, nên thành bánh không xuyên qua nhau.
+  const PIE_BOX = { w: 343, h: 246, cx: 171.5, cy: 152, rOut: 150, rIn: 80, tilt: 0.56, gap: 5, height: 28, lift: 30, push: 7.5, badgeFrom: 30 };
+  const pieLift = new Map();  // mã loại -> { x: độ nhấc 0..1, v: vận tốc }
+  let pieFrame = null;
+  const liftOf = (x) => (pieLift.get(x.code) || { x: 0 }).x;
+  function pieShapes(slices) {
+    const { cx, cy, rOut, rIn, tilt, gap, height, lift, push, badgeFrom } = PIE_BOX, rad = Math.PI / 180;
+    const sinOf = (t) => Math.sin(t * rad);
+    const at = (x, r, t, z, floor) => {
+      const l = liftOf(x), g = gap + push * l;
+      return [cx + g * Math.cos(x.mid * rad) + r * Math.cos(t * rad),
+        cy + g * sinOf(x.mid) * tilt + r * sinOf(t) * tilt - z - (floor ? 0 : lift * l)];
     };
-    const order = [...slices.filter((x) => x.code !== active), ...slices.filter((x) => x.code === active)];
-    return `<svg viewBox="0 0 ${w} ${h}" aria-hidden="true" focusable="false">
-      <defs><clipPath id="pie-hole"><ellipse cx="${cx}" cy="${cy}" rx="${irx.toFixed(1)}" ry="${iry.toFixed(1)}"/></clipPath></defs>
-      <g class="pie-slices">${order.map(piece).join("")}</g>
+    const arc = (x, r, a, b, z, floor) => {
+      const n = Math.max(2, Math.ceil(Math.abs(b - a) / 2));
+      return Array.from({ length: n + 1 }, (_, i) => at(x, r, a + ((b - a) * i) / n, z, floor));
+    };
+    // Những đoạn của [a, b] nằm ở nửa sau (thành trong) hoặc nửa trước (thành ngoài)
+    const halves = (a, b, back) => {
+      const out = [], n = Math.ceil((b - a) / 0.5);
+      let start = null;
+      for (let i = 0; i <= n; i++) {
+        const t = a + ((b - a) * i) / n, ok = back ? sinOf(t) <= 0.001 : sinOf(t) >= -0.001;
+        if (ok && start === null) start = t;
+        if ((!ok || i === n) && start !== null) { if (t - start > 0.3) out.push([start, t]); start = null; }
+      }
+      return out;
+    };
+    const points = (pts) => pts.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
+    const pieces = [];
+    slices.forEach((x) => {
+      const cuts = [x.from];
+      for (let c = Math.ceil(x.from / 90) * 90; c < x.to; c += 90) if (c > x.from + 0.01) cuts.push(c);
+      cuts.push(x.to);
+      for (let i = 0; i < cuts.length - 1; i++) pieces.push({ x, s: cuts[i], e: cuts[i + 1], key: sinOf((cuts[i] + cuts[i + 1]) / 2) });
+    });
+    pieces.sort((p, q) => p.key - q.key);
+    const parts = [];
+    const add = (x, shade, pts) => parts.push({ x, shade, pts: points(pts) });
+    const cut = (x, t) => [at(x, rIn, t, 0), at(x, rOut, t, 0), at(x, rOut, t, height), at(x, rIn, t, height)];
+    pieces.forEach(({ x, s, e }) => {
+      const whole = x.share >= 0.9995;
+      halves(s, e, true).forEach(([a, b]) => add(x, "dark", [...arc(x, rIn, a, b, height), ...arc(x, rIn, b, a, 0)]));
+      if (s === x.from && !whole) add(x, "dark", cut(x, s));
+      if (e === x.to && !whole) add(x, "dark", cut(x, e));
+      halves(s, e, false).forEach(([a, b]) => add(x, "side", [...arc(x, rOut, a, b, 0), ...arc(x, rOut, b, a, height)]));
+      add(x, "top", [...arc(x, rOut, s, e, height), ...arc(x, rIn, e, s, height)]);
+    });
+    return {
+      parts,
+      shadows: slices.map((x) => ({ pts: points([...arc(x, rOut, x.from, x.to, 0, true), ...arc(x, rIn, x.to, x.from, 0, true)]), opacity: 0.22 * Math.min(Math.max(liftOf(x), 0), 1.2) })),
+      badges: slices.filter((x) => x.to - x.from >= badgeFrom).map((x) => { const [bx, by] = at(x, (rOut + rIn) / 2, x.mid, height); return { no: x.no, bx: bx.toFixed(1), by: by.toFixed(1), ty: (by + 5).toFixed(1) }; }),
+    };
+  }
+  function pieSvg(slices, active) {
+    const { w, h } = PIE_BOX, { parts, shadows, badges } = pieShapes(slices);
+    const tone = (x, shade) => `var(--pie-${x.tone}${shade === "top" ? "" : "-" + shade})`;
+    return `<svg viewBox="0 0 ${w} ${h}" data-on="${active || ""}" aria-hidden="true" focusable="false">
+      <defs><filter id="pie-soft" x="-20%" y="-40%" width="140%" height="180%"><feGaussianBlur stdDeviation="5"/></filter></defs>
+      ${shadows.map((s) => `<polygon class="pie-shadow" points="${s.pts}" opacity="${s.opacity.toFixed(3)}" filter="url(#pie-soft)"${s.opacity > 0.002 ? "" : " display=\"none\""}/>`).join("")}
+      ${parts.map((p) => `<polygon class="pie-part" data-action="bc-slice" data-v="${p.x.code}" points="${p.pts}" style="fill:${tone(p.x, p.shade)};stroke:${tone(p.x, p.shade)}"/>`).join("")}
+      ${badges.map((b) => `<g class="pie-badge"><circle cx="${b.bx}" cy="${b.by}" r="17"/><text x="${b.bx}" y="${b.ty}">${b.no}</text></g>`).join("")}
     </svg>`;
   }
-  const pieDetail = (x) => (x
-    ? `<strong>${esc(x.name)}</strong><span class="pie-money">${money(x.rev)}</span><small>${x.pct}% doanh thu · ${num(x.cartons)} thùng</small>`
-    : '<span class="pie-hint">Chạm hoặc giữ một miếng để xem số.</span>');
-  // Nhấc miếng bánh tại chỗ, không vẽ lại cả trang
+  // Mỗi khung chỉ đổi toạ độ của các hình có sẵn, nên chạm trúng lúc đang chuyển động vẫn ăn
+  function pieDraw() {
+    const svg = document.querySelector("#pie svg");
+    if (!svg) return;
+    const { parts, shadows, badges } = pieShapes(pieNow);
+    svg.querySelectorAll(".pie-part").forEach((n, i) => n.setAttribute("points", parts[i].pts));
+    svg.querySelectorAll(".pie-shadow").forEach((n, i) => {
+      n.setAttribute("points", shadows[i].pts); n.setAttribute("opacity", shadows[i].opacity.toFixed(3));
+      if (shadows[i].opacity > 0.002) n.removeAttribute("display"); else n.setAttribute("display", "none");
+    });
+    svg.querySelectorAll(".pie-badge").forEach((n, i) => {
+      const [c, t] = n.children, b = badges[i];
+      c.setAttribute("cx", b.bx); c.setAttribute("cy", b.by); t.setAttribute("x", b.bx); t.setAttribute("y", b.ty);
+    });
+  }
+  // Về thẳng trạng thái cuối, không chuyển động (vẽ lại trang, hoặc máy tắt hiệu ứng)
+  function pieSnap() {
+    if (pieFrame) { cancelAnimationFrame(pieFrame); pieFrame = null; }
+    pieLift.clear();
+    pieNow.forEach((x) => pieLift.set(x.code, { x: x.code === bc.slice ? 1 : 0, v: 0 }));
+  }
+  function pieSpring() {
+    if (pieFrame) return;
+    const step = () => {
+      pieFrame = null;
+      if (!document.querySelector("#pie svg")) return;
+      let moving = false;
+      pieNow.forEach((x) => {
+        const s = pieLift.get(x.code), target = x.code === bc.slice ? 1 : 0;
+        s.v += (target - s.x) * 0.13;
+        s.v *= 0.7;
+        s.x += s.v;
+        if (Math.abs(target - s.x) < 0.002 && Math.abs(s.v) < 0.002) { s.x = target; s.v = 0; } else moving = true;
+      });
+      pieDraw();
+      if (moving) pieFrame = requestAnimationFrame(step);
+    };
+    pieFrame = requestAnimationFrame(step);
+  }
+  const pieDetail = (x) => `<strong>${esc(x.name)}</strong><span class="pie-money">${num(x.rev)}</span><small>${x.pct}% doanh thu · ${num(x.cartons)} thùng</small>`;
+  // Chọn một loại: miếng mới nhấc lên, miếng cũ hạ xuống cùng lúc; không vẽ lại cả trang
   function pieSet(code) {
     if (bc.slice === code) return;
     bc.slice = code;
-    const holder = document.querySelector("#pie .pie-slices");
-    if (!holder) return;
-    holder.querySelectorAll(".slice.on").forEach((g) => g.classList.remove("on"));
-    if (code) {
-      const g = holder.querySelector(`[data-slice="${CSS.escape(code)}"]`);
-      if (g) { holder.appendChild(g); g.getBoundingClientRect(); g.classList.add("on"); }
+    const svg = document.querySelector("#pie svg");
+    if (svg) {
+      svg.setAttribute("data-on", code);
+      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) { pieSnap(); pieDraw(); } else pieSpring();
     }
     const d = document.getElementById("pie-detail");
     if (d) d.innerHTML = pieDetail(pieNow.find((x) => x.code === code));
@@ -1623,37 +1698,18 @@
     const m = bcMonth(), os = soldOrders().filter((o) => monthOf(soldDay(o)) === m);
     const rev = sum(os, orderValue), profit = rev - sum(os, costOf);
     pieNow = pieSlices(os);
-    if (bc.slice === undefined) bc.slice = pieNow.length ? pieNow[0].code : null;
-    else if (!pieNow.some((x) => x.code === bc.slice)) bc.slice = null;
+    if (!pieNow.some((x) => x.code === bc.slice)) bc.slice = pieNow.length ? pieNow[0].code : null;
+    pieSnap();
     return band({ title: `Báo cáo tháng ${monthText(m)}`, back: "#/", exact: true,
       side: `<button class="who icon" data-action="bc-months" aria-label="Chọn tháng khác, đang xem tháng ${monthText(m)}">${ICON.cal}</button>`,
       totals: total("Doanh thu", rev ? num(rev) : NONE, "#/baocao") + total("Lợi nhuận", rev ? num(Math.round(profit / 1000) * 1000) : NONE, "#/baocao") }) + `
-    <h2 class="sec">Theo loại hàng</h2>
+    <h2 class="sec">Theo loại hàng · Tháng ${mo(m)}</h2>
     ${pieNow.length ? `<div class="pie-detail" id="pie-detail" aria-live="polite">${pieDetail(pieNow.find((x) => x.code === bc.slice))}</div>
     <div id="pie">${pieSvg(pieNow, bc.slice)}</div>
-    <ul class="pie-legend">${pieNow.map((x) => `<li><button type="button" class="pie-key" data-action="bc-slice" data-v="${x.code}" aria-pressed="${x.code === bc.slice}" style="--c:var(--pie-${x.tone[0]})"><span class="pie-swatch" aria-hidden="true"></span><span>${esc(x.name)}</span><b>${num(x.rev)}</b></button></li>`).join("")}</ul>`
+    <ul class="pie-legend">${pieNow.map((x) => `<li><button type="button" class="pie-key" data-action="bc-slice" data-v="${x.code}" aria-pressed="${x.code === bc.slice}" style="--c:var(--pie-${x.tone})"><span class="pie-swatch" aria-hidden="true"></span><span class="pie-no">${x.no}</span><span>${esc(x.name)}</span><span class="pie-share">${x.pct}%</span><b>${num(x.rev)}</b></button></li>`).join("")}</ul>`
       : `<p class="empty">Tháng ${monthText(m)} chưa bán thùng nào. Chạm vào hình lịch ở góc trên để xem tháng khác.</p>`}`;
   }
 
-  // Bánh: nhấn xuống là nhấc miếng lên, buông ra vẫn giữ để đọc số; chạm lại miếng đó hoặc chỗ trống thì đặt xuống.
-  // Đang vuốt cuộn trang thì máy huỷ lần nhấn: trả về như trước.
-  let piePress = null;
-  document.addEventListener("pointerdown", (e) => {
-    if (!e.target.closest || !e.target.closest("#pie")) return;
-    const g = e.target.closest("[data-slice]"), code = g ? g.dataset.slice : null;
-    piePress = { was: bc.slice, code };
-    if (code && code !== bc.slice) pieSet(code);
-  });
-  document.addEventListener("pointerup", () => {
-    if (!piePress) return;
-    const p = piePress; piePress = null;
-    if (!p.code || p.code === p.was) pieSet(null);
-  });
-  document.addEventListener("pointercancel", () => {
-    if (!piePress) return;
-    const p = piePress; piePress = null;
-    pieSet(p.was);
-  });
   document.addEventListener("contextmenu", (e) => { if (e.target.closest && e.target.closest("#pie")) e.preventDefault(); });
 
   // ---------- Bảng chọn người / xác nhận ----------
@@ -1837,7 +1893,7 @@
       if (!path.startsWith("don/moi") && !side) od = null;
       if (!path.startsWith("tien/tra")) delete drafts.tra;
       if (!side) delete drafts.khach;
-      if (!path.startsWith("baocao")) bc = { month: null, slice: undefined };
+      if (!path.startsWith("baocao")) bc = { month: null, slice: null };
       if (!path.startsWith("sx")) sx = { step: 1, product: null, color: null, cartons: 0 };
       lastPath = path;
       render();
@@ -2260,8 +2316,8 @@
         render();
         break;
       case "bc-months": monthsSheet(); break;
-      case "bc-month": bc.month = v; bc.slice = undefined; closeSheet(); render(); break;
-      case "bc-slice": pieSet(bc.slice === v ? null : v); break;
+      case "bc-month": bc.month = v; bc.slice = null; closeSheet(); render(); break;
+      case "bc-slice": pieSet(v); break;
       case "cust-add": setDraft("khach", "name", v); location.hash = `#/khach-moi?ve=${enc(location.hash.slice(1))}`; break;
       case "vt-material": case "vt-supplier": case "dau-supplier": {
         const [F, field] = el.dataset.action === "vt-material" ? ["vt", "material"] : [el.dataset.action.slice(0, -9), "supplier"];

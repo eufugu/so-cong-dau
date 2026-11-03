@@ -84,7 +84,7 @@ test('worker records cash: he holds it, not yet received, until Mẹ confirms', 
   expect(p.by).toBe('Bác Khang');
   await page.goto('/#/tien/thu');
   await expect(page.getByText('Bác Khang đang cầm')).toBeVisible();
-  await expect(page.locator('.total', { hasText: 'Chưa về tay Liên' })).toContainText('500');
+  await expect(page.locator('.total', { hasText: 'Chưa về tay' })).toContainText('500');
 
   // Mẹ thấy khoản này và bấm đã nhận
   const mom = await otherPhone(browser, baseURL, OWNER);
@@ -259,10 +259,9 @@ test('Ghi tiền: search without diacritics, debt once with Trả hết, date be
   await expect(page.locator('form')).not.toContainText('Chuyến');
   await page.getByRole('button', { name: 'Trả hết' }).click();
   await expect(page.locator('#pay-amount')).toHaveValue('720.000');
-  await expect(page.locator('#pay-date')).toHaveCount(0);
-  await expect(page.locator('.pay-day')).toContainText('Hôm nay');
-  await page.getByRole('button', { name: 'Đổi ngày' }).click();
-  await expect(page.locator('#pay-date')).toBeVisible();
+  await expect(page.locator('.date-show')).toContainText('Hôm nay');
+  await page.locator('#pay-date').fill('2026-10-05');
+  await expect(page.locator('.date-show')).toContainText('Thứ Hai, 05/10');
 });
 
 test('a login whose name is written in NFD still gets rows the server accepts, with by in NFC', async ({ page }) => {
@@ -335,7 +334,7 @@ test('Hôm nay: revenue instead of debt, a calm money row, tap opens the money p
   const mom = await otherPhone(browser, baseURL, OWNER);
   await expect(mom.page.locator('.band .total')).toContainText(`Doanh thu tháng ${day.getMonth() + 1}`);
   await expect(mom.page.locator('.band .total')).not.toContainText('tới ngày');
-  await expect(mom.page.locator('.band .total b')).toHaveText('720.000');
+  await expect(mom.page.locator('.band .total b')).toContainText('720nghìn');
   await expect(mom.page.locator('.rev svg rect')).toHaveCount(1);
   await expect(mom.page.locator('main')).not.toContainText(/nợ/i);
   await expect(mom.page.getByRole('link', { name: /Ghi sản xuất/ })).toBeVisible();
@@ -371,7 +370,9 @@ test('Lên đơn: find a customer without diacritics, pick any date, the order k
   await page.goto('/#/don/moi');
   await expect(page.getByRole('button', { name: 'Giao hôm qua' })).toHaveCount(0);
   await expect(page.locator('.date-show')).toContainText('Hôm nay');
-  // Danh sách hiện đủ mọi khách khi chưa gõ
+  // Danh sách đóng cho tới khi chạm vào ô tìm, rồi hiện đủ mọi khách khi chưa gõ
+  await expect(page.locator('.cp-list')).toBeHidden();
+  await page.locator('#od-q').click();
   await expect(page.locator('.cp-list')).toContainText('Khách Thử');
   await expect(page.locator('.cp-list')).toContainText('Cậu Minh');
   await expect(page.getByRole('link', { name: 'Khách mới' })).toBeVisible();
@@ -398,6 +399,7 @@ test('Ghi tiền opens with only the customer step; amounts never sit on the nam
   await page.goto('/#/tien/ghi');
   await expect(page.locator('#pay-amount')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Lưu', exact: true })).toHaveCount(0);
+  await page.locator('#pay-q').click();
   await expect(page.locator('.cp-list')).not.toContainText('720.000');
   await page.getByRole('button', { name: CUST.name, exact: true }).click();
   await expect(page.locator('#pay-amount')).toBeFocused();
@@ -438,7 +440,7 @@ test('owner shows as Liên on screen, while rows still store Mẹ Liên and Tài
   await expect.poll(async () => (await getDocs('payments')).map((x) => x.holder).sort()).toEqual(['Mẹ Liên', 'Tài khoản Mẹ']);
   await page.goto('/#/tien/thu');
   await expect(page.getByText('TÀI KHOẢN LIÊN')).toBeVisible();
-  await expect(page.getByText('ĐÃ NỘP LIÊN').first()).toBeVisible();
+  await expect(page.locator('main')).not.toContainText('ĐÃ NỘP');
   await expect(page.locator('main')).not.toContainText(/Mẹ|MẸ/);
 });
 
@@ -448,6 +450,7 @@ test('customer picker: one alphabetical list, word starts first, add a name that
   }
   await openAs(page, WORKER);
   await page.goto('/#/don/moi');
+  await page.locator('#od-q').click();
   await expect(page.locator('.cp-item').first()).toHaveText('Bình');
   await expect(page.locator('main')).not.toContainText('Mua gần đây');
   await page.locator('#od-q').fill('huong');
@@ -461,7 +464,7 @@ test('customer picker: one alphabetical list, word starts first, add a name that
   await expect(page.locator('.picked button')).toContainText('Cô Mới');
 });
 
-test('debt age: grey up to 14 days, red after, on the list and the customer page', async ({ page }) => {
+test('debt age: grey up to 14 days, red after, on the debtors list', async ({ page }) => {
   const ago = (n) => { const d = new Date(Date.now() - n * 864e5); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
   const order = (id, cust, day) => putDoc('orders', id, { id, date: day, deliver: day, customerId: cust.id, customer: cust.name, product: 'DAU-0.5', color: 'Đỏ', cartons: 1, price: 360000, status: 'Đã giao', by: 'Excel', void: false });
   const other = { id: 'k-m', name: 'Cậu Minh' };
@@ -475,8 +478,6 @@ test('debt age: grey up to 14 days, red after, on the list and the customer page
   await expect(age(CUST.name)).not.toHaveClass(/late/);
   await expect(age(other.name)).toHaveText('15 ngày');
   await expect(age(other.name)).toHaveClass(/late/);
-  await page.locator('a.row', { hasText: other.name }).click();
-  await expect(page.locator('.total').first().locator('.age.late')).toHaveText('15 ngày');
 });
 
 test('Nhập hàng: search materials without diacritics, add a new supplier, the row saves as before', async ({ page }) => {
@@ -495,7 +496,7 @@ test('Nhập hàng: search materials without diacritics, add a new supplier, the
   expect([x.material, x.qty, x.supplier]).toEqual(['TEM-HS', 100, 'Nhà Mới']);
 });
 
-test('Báo cáo: month picker, the two cards, press a slice to read it, and a friendly empty month', async ({ page, browser, baseURL }) => {
+test('Báo cáo: calendar icon with a narrow month list, tr cards, nothing in the hole, tap a slice, tap outside clears it', async ({ page }) => {
   const now = new Date(), key = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   const thisM = key(now), lastM = key(new Date(now.getFullYear(), now.getMonth() - 1, 1));
   const label = (m) => `${Number(m.slice(5))}/${m.slice(0, 4)}`;
@@ -507,38 +508,170 @@ test('Báo cáo: month picker, the two cards, press a slice to read it, and a fr
   await expect(page.locator('h1')).toHaveText(`Báo cáo tháng ${label(thisM)}`);
   await expect(page.locator('main .empty')).toContainText('chưa bán thùng nào');
   await expect(page.locator('#pie')).toHaveCount(0);
-  await page.getByRole('button', { name: /Chọn tháng khác/ }).click();
-  await page.getByRole('button', { name: `Tháng ${label(lastM)}` }).click();
+  // Danh sách tháng mở ngay dưới hình lịch, hẹp, chạm ra ngoài thì đóng
+  await expect(page.locator('#month-list')).toBeHidden();
+  await page.locator('#month-btn').click();
+  const list = await page.locator('#month-list').boundingBox(), btn = await page.locator('#month-btn').boundingBox();
+  expect(list.y).toBeGreaterThanOrEqual(btn.y + btn.height);
+  expect(list.width).toBeLessThan(250);
+  await page.locator('h1').click();
+  await expect(page.locator('#month-list')).toBeHidden();
+  await page.locator('#month-btn').click();
+  await page.locator('#month-list').getByRole('button', { name: `Tháng ${label(lastM)}` }).click();
   await expect(page.locator('h1')).toHaveText(`Báo cáo tháng ${label(lastM)}`);
-  await expect(page.locator('.total').first()).toContainText('1.000.000');
+  await expect(page.locator('#month-list')).toBeHidden();
+  await expect(page.locator('.total').first()).toContainText('1tr');
   await expect(page.locator('.total').nth(1)).toContainText('Lợi nhuận');
-  // Doanh thu cao nhất trước; miếng lớn nhất được nhấc sẵn
-  await expect(page.locator('.pie-no')).toHaveText(['01', '02']);
-  await expect(page.locator('.pie-key span:nth-child(3)')).toHaveText(['1L', 'Hoa sen']);
-  await expect(page.locator('.pie-badge text')).toHaveText(['01', '02']);
+  // Doanh thu cao nhất trước; chưa chọn miếng nào thì giữa bánh ghi tổng; không còn số thứ tự
+  await expect(page.locator('.pie-badge')).toHaveCount(0);
+  await expect(page.locator('.pie-no')).toHaveCount(0);
+  await expect(page.locator('.pie-key span:nth-child(2)')).toHaveText(['1L', 'Hoa sen']);
   await expect(page.locator('.pie-share')).toHaveText(['90%', '10%']);
-  await expect(page.getByRole('heading', { name: `Theo loại hàng · Tháng ${Number(lastM.slice(5))}` })).toBeVisible();
-  await expect(page.locator('.pie-pct')).toHaveCount(0);
   await expect(page.locator('.pie-key b')).toHaveText(['900.000', '100.000']);
-  await expect(page.locator('#pie svg')).toHaveAttribute('data-on', 'DAU-0.5');
-  await expect(page.locator('#pie-detail')).toContainText('90% doanh thu · 3 thùng');
+  await expect(page.locator('#pie svg')).toHaveAttribute('data-on', '');
+  await expect(page.locator('#pie')).not.toContainText('1tr');
+  await expect(page.locator('.pie-shadow:not([display])')).toHaveCount(0);
   await expect(page.locator('main')).not.toContainText('Lãi theo tháng');
   await expect(page.locator('main')).not.toContainText('Lãi mỗi thùng');
   await expect(page.locator('main')).not.toContainText('Giá vốn tính');
-  // Chạm lên chính miếng bánh: miếng được chọn nhấc lên nguyên khối, số đi theo, có bóng dưới sàn
-  const badgeY = () => page.locator('.pie-badge circle').nth(1).evaluate((c) => Number(c.getAttribute('cy')));
-  const before = await badgeY();
-  await page.locator('.pie-badge circle').nth(1).evaluate((c) => c.getBoundingClientRect()).then((r) => page.mouse.click(r.x + r.width / 2, r.y + r.height / 2));
+  // Chạm lên chính miếng bánh: miếng đó nhấc lên nguyên khối, giữa bánh chỉ ghi số tiền của nó
+  const top = page.locator('.pie-part[data-v="DAU-HS"]').last();
+  const spot = () => top.evaluate((n) => { const pts = n.getAttribute('points').trim().split(' ').map((q) => q.split(',').map(Number)); const m = n.getScreenCTM(); const x = pts.reduce((a, q) => a + q[0], 0) / pts.length, y = pts.reduce((a, q) => a + q[1], 0) / pts.length; return { x: x * m.a + m.e, y: y * m.d + m.f }; });
+  const before = await spot();
+  await page.mouse.click(before.x, before.y);
   await expect(page.locator('#pie svg')).toHaveAttribute('data-on', 'DAU-HS');
-  await expect(page.locator('#pie-detail')).toContainText('100.000');
-  await expect(page.locator('#pie-detail')).toContainText('10% doanh thu · 1 thùng');
-  await expect.poll(async () => before - (await badgeY())).toBeGreaterThan(25);
+  await expect(page.locator('.pie-key', { hasText: 'Hoa sen' })).toHaveAttribute('aria-pressed', 'true');
+  await expect.poll(async () => before.y - (await spot()).y).toBeGreaterThan(15);
   await expect.poll(() => page.locator('.pie-shadow:not([display])').count()).toBe(1);
   // Hàng chú giải cũng chọn được, không cần chạm trúng miếng nhỏ
   await page.locator('.pie-key', { hasText: '1L' }).click();
-  await expect(page.locator('#pie-detail')).toContainText('90% doanh thu · 3 thùng');
   await expect(page.locator('#pie svg')).toHaveAttribute('data-on', 'DAU-0.5');
-  await expect.poll(() => page.locator('.pie-shadow:not([display])').count()).toBe(1);
+  // Chạm ra ngoài bánh: về số tổng ban đầu, không còn miếng nào nhấc
+  await page.locator('h2.sec').first().click();
+  await expect(page.locator('#pie svg')).toHaveAttribute('data-on', '');
+  await expect.poll(() => page.locator('.pie-shadow:not([display])').count()).toBe(0);
+});
+
+test('one payment badge with three states on Đơn hàng, the customer page, Sổ tiền and the bill', async ({ page }) => {
+  const paid = { id: 'k-p', name: 'Trả Đủ' }, part = { id: 'k-c', name: 'Trả Một Phần' };
+  for (const c of [paid, part]) await putDoc('customers', c.id, { ...c, phone: '', address: '', by: 'Excel', void: false });
+  const order = (id, c) => putDoc('orders', id, { id, date: '2026-10-05', deliver: '2026-10-05', customerId: c.id, customer: c.name, product: 'DAU-0.5', color: 'Đỏ', cartons: 2, price: 500000, status: 'Đã giao', by: 'Excel', void: false });
+  const pay = (id, c, amount) => putDoc('payments', id, { id, date: '2026-10-06', customerId: c.id, customer: c.name, amount, method: 'TM', holder: 'Bác Khang', handed: false, handedDate: null, by: 'Bác Khang', void: false });
+  await order('o-1', CUST); await order('o-2', paid); await order('o-3', part);
+  await pay('p-1', paid, 1000000); await pay('p-2', part, 400000);
+  await openAs(page, OWNER);
+  await page.goto('/#/don');
+  const status = (name) => page.locator('a.row', { hasText: name }).locator('.badge');
+  await expect(status(CUST.name)).toHaveText('Chưa trả');
+  await expect(status(CUST.name)).toHaveClass(/unpaid/);
+  await expect(status(part.name)).toHaveText('Còn nợ');
+  await expect(status(part.name)).toHaveClass(/part/);
+  await expect(status(paid.name)).toHaveText('Đã trả');
+  await expect(status(paid.name)).toHaveClass(/paid/);
+  // Tiền chưa về tay Liên vẫn là Đã trả, và đầu ngày chỉ ghi số đơn
+  await expect(page.locator('.day-head small').first()).toHaveText('3 đơn');
+  await expect(page.locator('main')).not.toContainText('CHƯA VỀ LIÊN');
+  await status(part.name).click();
+  await expect(page.locator('.band .badge')).toHaveText('Còn nợ');
+  await expect(page.locator('.band .total b')).toContainText('600nghìn');
+  await page.goto('/#/tien');
+  await expect(status(paid.name)).toHaveText('Đã trả');
+  await expect(page.locator('main')).not.toContainText('ĐÃ TRẢ');
+  await page.goto(`/#/khach/${part.id}`);
+  await expect(page.locator('a.row', { hasText: 'Chuyến 05/10' }).locator('.badge')).toHaveText('Còn nợ');
+  await expect(page.locator('a.row', { hasText: 'Chuyến 05/10' })).not.toContainText('ngày');
+});
+
+test('pickers: selected box is the name only, tapping it reopens, tapping outside closes', async ({ page }) => {
+  await openAs(page, WORKER);
+  await page.goto('/#/don/moi');
+  await page.locator('#od-q').click();
+  await expect(page.locator('.cp-list')).toBeVisible();
+  await page.locator('h1').click();
+  await expect(page.locator('.cp-list')).toBeHidden();
+  await page.locator('#od-q').click();
+  await page.getByRole('button', { name: CUST.name, exact: true }).click();
+  const box = page.locator('.picked button');
+  await expect(box).toHaveText(CUST.name);
+  await box.click();
+  await expect(page.locator('.cp-list')).toBeVisible();
+
+  await page.goto('/#/sx');
+  await page.getByRole('button', { name: /^1L/ }).first().click();
+  await page.getByRole('button', { name: 'Đỏ', exact: true }).click();
+  await expect(page.locator('.picked')).not.toContainText('chọn lại');
+  await page.locator('#sx-n').fill('1');
+  await expect(page.getByRole('button', { name: 'Lưu hàng', exact: true })).toBeEnabled();
+  await page.locator('.picked button').first().click();
+  await expect(page.locator('.form > .choices .choice')).toHaveCount(6);
+});
+
+test('Nhập hàng: supplier sits under Vật tư, + Thêm NCC adds one on the spot, date row on every tab', async ({ page }) => {
+  await openAs(page, WORKER);
+  await page.goto('/#/nhap');
+  await expect(page.locator('form .field').nth(1)).toContainText('Mua của ai');
+  await expect(page.locator('.date-show')).toContainText('Hôm nay');
+  await page.locator('#vt-m').click();
+  await page.locator('h1').click();
+  await expect(page.locator('#vt-m-list')).toBeHidden();
+  await page.getByRole('button', { name: 'Thêm NCC' }).click();
+  await page.getByRole('button', { name: 'Thêm', exact: true }).click();
+  await expect(page.locator('#ncc-err')).toBeVisible();
+  await page.locator('#ncc-name').fill('Nhà Mới');
+  await page.getByRole('button', { name: 'Thêm', exact: true }).click();
+  await expect(page.locator('.picked button')).toHaveText('Nhà Mới');
+  await page.locator('#vt-m').fill('tem hoa');
+  await page.getByRole('button', { name: 'Tem hoa sen', exact: true }).click();
+  await expect(page.locator('.picked button').first()).toHaveText('Tem hoa sen');
+  await page.locator('#vt-q').fill('10');
+  await page.locator('#vt-d').fill('2026-10-05');
+  await expect(page.locator('.date-show')).toContainText('05/10');
+  await page.getByRole('button', { name: 'Lưu', exact: true }).click();
+  await expect.poll(async () => (await getDocs('purchases')).length, { timeout: 15000 }).toBe(1);
+  const [x] = await getDocs('purchases');
+  expect([x.material, x.supplier, x.date]).toEqual(['TEM-HS', 'Nhà Mới', '2026-10-05']);
+  await page.goto('/#/nhap/dau');
+  await expect(page.locator('.date-show')).toContainText('Hôm nay');
+  await page.goto('/#/nhap/hh');
+  await expect(page.locator('.date-show')).toContainText('Hôm nay');
+});
+
+test('Hoá đơn shows only the bill: colours with price on one line, cartons only in the total, back to where it opened', async ({ page }) => {
+  const line = (id, color, cartons) => putDoc('orders', id, { id, date: '2026-10-05', deliver: '2026-10-05', customerId: CUST.id, customer: CUST.name, product: 'DAU-HS', color, cartons, price: 530000, status: 'Đã giao', by: 'Bác Khang', void: false });
+  await line('o-1', 'Vàng', 3); await line('o-2', 'Đỏ', 2);
+  await putDoc('payments', 'p-1', { id: 'p-1', date: '2026-10-06', customerId: CUST.id, customer: CUST.name, amount: 500000, method: 'TM', holder: 'Mẹ Liên', handed: true, handedDate: '2026-10-06', by: 'Mẹ Liên', void: false });
+  await openAs(page, OWNER);
+  await page.goto('/#/don');
+  await page.locator('a.row', { hasText: CUST.name }).click();
+  await expect(page.locator('.bill-line')).toHaveText(['2 đỏ × 530.000', '3 vàng × 530.000']);
+  await expect(page.locator('.ledger.sum')).toContainText('5 thùng');
+  await expect(page.locator('.ledger.bill').first()).not.toContainText('thùng');
+  for (const gone of ['Tiền trả ngày', 'Sổ của khách', 'Ghi tiền trả', 'Người ghi']) await expect(page.locator('main')).not.toContainText(gone);
+  await expect(page.getByRole('link', { name: 'Quay lại' })).toHaveAttribute('href', '#/don');
+  // Từ Sổ tiền: sổ của khách chỉ ghi ngày chuyến, chuyến mới nhất trước, không có mô tả dài
+  await page.goto(`/#/khach/${CUST.id}`);
+  await expect(page.locator('main')).not.toContainText('trừ vào chuyến cũ nhất');
+  await expect(page.locator('main')).not.toContainText('Khách đã trả');
+  const trip = page.locator('a.row', { hasText: 'Chuyến 05/10' });
+  await expect(trip.locator('.what small')).toHaveCount(0);
+  await trip.click();
+  await expect(page.locator('.bill-line')).toHaveCount(2);
+  await expect(page.getByRole('link', { name: 'Quay lại' })).toHaveAttribute('href', `#/khach/${CUST.id}`);
+});
+
+test('Sản xuất: any past date from the same date box, and the row keeps that date', async ({ page }) => {
+  await openAs(page, WORKER);
+  await page.goto('/#/sx');
+  await page.getByRole('button', { name: /^2L/ }).first().click();
+  await page.getByRole('button', { name: 'Vàng', exact: true }).click();
+  await expect(page.locator('.date-show')).toContainText('Hôm nay');
+  await page.locator('#sx-date').fill('2026-10-05');
+  await expect(page.locator('.date-show')).toContainText('Thứ Hai, 05/10');
+  await page.locator('#sx-n').fill('3');
+  await page.getByRole('button', { name: 'Lưu cho ngày 05/10' }).click();
+  await expect.poll(async () => (await getDocs('production')).length, { timeout: 15000 }).toBe(1);
+  const [x] = await getDocs('production');
+  expect([x.date, x.cartons, x.color]).toEqual(['2026-10-05', 3, 'Vàng']);
 });
 
 test('the font comes from the app itself, never from another site', async ({ page }) => {

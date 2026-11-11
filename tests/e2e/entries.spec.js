@@ -546,10 +546,58 @@ test('Báo cáo: calendar icon with a narrow month list, tr cards, nothing in th
   // Hàng chú giải cũng chọn được, không cần chạm trúng miếng nhỏ
   await page.locator('.pie-key', { hasText: '1L' }).click();
   await expect(page.locator('#pie svg')).toHaveAttribute('data-on', 'DAU-0.5');
+  // Chạm lại đúng tên đang chọn thì miếng hạ xuống; chạm hai lần liền thì nhấc lên rồi hạ xuống
+  await page.locator('.pie-key', { hasText: '1L' }).click();
+  await expect(page.locator('#pie svg')).toHaveAttribute('data-on', '');
+  await expect(page.locator('.pie-key[aria-pressed="true"]')).toHaveCount(0);
+  await expect.poll(() => page.locator('.pie-shadow:not([display])').count()).toBe(0);
+  await page.locator('.pie-key', { hasText: 'Hoa sen' }).dblclick();
+  await expect(page.locator('#pie svg')).toHaveAttribute('data-on', '');
+  await expect.poll(() => page.locator('.pie-shadow:not([display])').count()).toBe(0);
+  // Chạm lên miếng đang nhấc cũng hạ nó xuống
+  await page.locator('#pie').scrollIntoViewIfNeeded();
+  const rest = await spot();
+  await page.mouse.click(rest.x, rest.y);
+  await expect(page.locator('#pie svg')).toHaveAttribute('data-on', 'DAU-HS');
+  await expect.poll(async () => rest.y - (await spot()).y).toBeGreaterThan(15);
+  const lifted = await spot();
+  await page.mouse.click(lifted.x, lifted.y);
+  await expect(page.locator('#pie svg')).toHaveAttribute('data-on', '');
+  await page.locator('.pie-key', { hasText: '1L' }).click();
+  await expect(page.locator('#pie svg')).toHaveAttribute('data-on', 'DAU-0.5');
   // Chạm ra ngoài bánh: về số tổng ban đầu, không còn miếng nào nhấc
   await page.locator('h2.sec').first().click();
   await expect(page.locator('#pie svg')).toHaveAttribute('data-on', '');
   await expect.poll(() => page.locator('.pie-shadow:not([display])').count()).toBe(0);
+});
+
+test('Sổ tiền: search a customer by name without diacritics, across Đang nợ and Đã trả đủ', async ({ page }) => {
+  const names = [['k-1', 'Cậu Minh'], ['k-2', 'Chị Hương'], ['k-3', 'Hương Chợ Mới'], ['k-4', 'Bác Đức'], ['k-5', 'Anh Tuấn'], ['k-6', 'Cô Lan']];
+  for (const [id, name] of names) {
+    await putDoc('customers', id, { id, name, phone: '', address: '', by: 'Excel', void: false });
+    await putDoc('orders', `o-${id}`, { id: `o-${id}`, date: '2026-10-01', deliver: '2026-10-01', customerId: id, customer: name, product: 'DAU-0.5', color: 'Đỏ', cartons: 1, price: 360000, status: 'Đã giao', by: 'Excel', void: false });
+  }
+  // Chị Hương đã trả đủ, Hương Chợ Mới còn nợ
+  await putDoc('payments', 'p-2', { id: 'p-2', date: '2026-10-02', customerId: 'k-2', customer: 'Chị Hương', amount: 360000, method: 'TM', holder: 'Mẹ Liên', handed: true, handedDate: '2026-10-02', by: 'Mẹ Liên', void: false });
+  await openAs(page, WORKER);
+  await page.goto('/#/tien');
+  const q = page.getByRole('searchbox', { name: 'Tìm khách theo tên' });
+  await expect(q).toHaveAttribute('placeholder', 'Tìm tên khách');
+  await q.fill('huong');
+  const list = page.locator('#tien-list');
+  await expect(list.locator('.row')).toHaveCount(2);
+  await expect(list.locator('h2.sec').first()).toContainText('1 khách');
+  await expect(list).toContainText('Hương Chợ Mới');
+  await expect(list.locator('.row.done')).toContainText('Chị Hương');
+  // Ô tìm không bị vẽ lại khi gõ: vẫn đang được chọn
+  await expect(q).toBeFocused();
+  await q.fill('xyz');
+  await expect(list).toHaveText('Không có khách nào tên “xyz”.');
+  await q.fill('');
+  await expect(list.locator('.row')).toHaveCount(6);
+  // Tab Tiền đã thu và Nhà cung cấp không có ô tìm khách
+  await page.goto('/#/tien/thu');
+  await expect(page.locator('#tien-q')).toHaveCount(0);
 });
 
 test('one payment badge with three states on Đơn hàng, the customer page, Sổ tiền and the bill', async ({ page }) => {

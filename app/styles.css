@@ -287,6 +287,10 @@ h3.grp b { color: var(--pen); font-size: var(--num-sum); font-weight: 700; lette
 table.stock th small.kg { display: block; font-size: 0.8rem; font-weight: 500; color: var(--ink-2); }
 .choice small { display: block; }
 details.more.data { margin-top: var(--section); }
+/* Mục gấp nằm thẳng trong trang (Kho: Vật tư còn đủ, Dữ liệu): nút có lề 16px như các nút khác, danh sách bên trong vẫn rộng hết trang */
+main > details.more:not(.data) { margin-top: 20px; }
+main > details.more > summary { margin: 0 16px; }
+main > details.more[open] > summary { margin-bottom: 8px; }
 .swatch.big { width: 44px; height: 44px; }
 .swatch.sm { width: 16px; height: 16px; vertical-align: -2px; margin-right: 6px; border-width: 1.5px; }
 .choice.color { min-height: 76px; }
@@ -344,6 +348,7 @@ details.more.data { margin-top: var(--section); }
 
 /* Đơn hàng: grouped by day, each bill says whether it is paid */
 .search { margin: 4px 16px 0; }
+.seg + .search { margin-top: 14px; }
 .search .input { font-size: 1.05rem; }
 .day-head small { font-variant-numeric: tabular-nums; }
 .counts { display: inline; }
@@ -537,7 +542,7 @@ button[aria-pressed="true"]::before, .picked button::before {
 .pie-shadow { fill: var(--pie-floor); pointer-events: none; }
 .pie-legend { list-style: none; margin: 8px 16px 0; padding: 0; }
 .pie-legend li + li { border-top: 1px solid var(--line); }
-.pie-key { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; padding: 4px 8px; border: 0; border-radius: var(--r); background: none; color: inherit; text-align: left; font-weight: 600; }
+.pie-key { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; padding: 4px 8px; border: 0; border-radius: var(--r); background: none; color: inherit; text-align: left; font-weight: 600; touch-action: manipulation; }
 .pie-key span:nth-child(2) { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .pie-share { flex: none; color: var(--ink-2); font-size: 0.9rem; font-weight: 500; }
 .pie-key[aria-pressed="true"] .pie-share { color: var(--paper); }

@@ -883,6 +883,17 @@
 
   // ---------- Trang: Sổ tiền ----------
   const payWay = (m) => (m === "CK" ? "Chuyển khoản" : m === "TM" ? "Tiền mặt" : "Chưa rõ trả bằng gì");
+  // Khách nợ và khách đã trả đủ; ô tìm tên khách lọc cả hai, không cần gõ dấu
+  let tienQ = "";
+  function tienList() {
+    const q = plain(tienQ), hit = (c) => !q || plain(c.name).includes(q);
+    const ds = debtors().filter(hit);
+    const clear = customerIds().map(customer).filter((c) => c.debt <= 0 && c.bought > 0 && hit(c));
+    if (q && !ds.length && !clear.length) return `<p class="empty">Không có khách nào tên “${esc(tienQ)}”.</p>`;
+    return `${ds.length || !q ? `<h2 class="sec">Đang nợ <small>${ds.length} khách</small></h2>
+      ${ds.length ? `<ul class="ledger">${ds.map((c) => row({ href: `#/khach/${enc(c.id)}`, what: esc(c.name), sub: owedText(c), much: vnd.full(c.debt) })).join("")}</ul>` : `<p class="empty">Không khách nào còn nợ.</p>`}` : ""}
+      ${clear.length ? `<h2 class="sec">Đã trả đủ</h2><ul class="ledger">${clear.map((c) => row({ href: `#/khach/${enc(c.id)}`, what: esc(c.name), much: payBadge(0), cls: "done" })).join("")}</ul>` : ""}`;
+  }
   function viewTien(tab) {
     const ds = debtors();
     const out = outsideMoney();
@@ -907,12 +918,9 @@
     }
 
     if (tab !== "thu") {
-      const clear = customerIds().map(customer).filter((c) => c.debt <= 0 && c.bought > 0);
-      return head + `<h2 class="sec">Đang nợ <small>${ds.length} khách</small></h2>
-      ${ds.length ? `<ul class="ledger">${ds.map((c) => {
-        return row({ href: `#/khach/${enc(c.id)}`, what: esc(c.name), sub: owedText(c), much: vnd.full(c.debt) });
-      }).join("")}</ul>` : `<p class="empty">Không khách nào còn nợ.</p>`}
-      ${clear.length ? `<h2 class="sec">Đã trả đủ</h2><ul class="ledger">${clear.map((c) => row({ href: `#/khach/${enc(c.id)}`, what: esc(c.name), much: payBadge(0), cls: "done" })).join("")}</ul>` : ""}`;
+      return head + `${customerIds().length > 6 ? `<div class="search"><label class="sr-only" for="tien-q">Tìm khách theo tên</label>
+      <input class="input" id="tien-q" type="search" autocomplete="off" placeholder="Tìm tên khách" value="${esc(tienQ)}"></div>` : ""}
+      <div id="tien-list" aria-live="polite">${tienList()}</div>`;
     }
 
     // Tiền chưa rõ ai cầm lên trước, để hỏi cho ra người cầm
@@ -2020,6 +2028,7 @@
     }
     // Tìm đơn theo tên khách: chỉ vẽ lại danh sách, ô tìm giữ nguyên
     if (t.id === "don-q") { donQ = t.value; const l = document.getElementById("don-list"); if (l) l.innerHTML = donList(); }
+    if (t.id === "tien-q") { tienQ = t.value; const l = document.getElementById("tien-list"); if (l) l.innerHTML = tienList(); }
   });
   document.addEventListener("change", (e) => {
     const t = e.target;
@@ -2391,7 +2400,8 @@
         break;
       case "bc-months": monthDrop(!bc.open); break;
       case "bc-month": bc.month = v; bc.slice = null; bc.open = false; render(); break;
-      case "bc-slice": pieSet(v); break;
+      // Chạm lại đúng loại đang nhấc (hay chạm hai lần liền) thì miếng đó hạ xuống
+      case "bc-slice": pieSet(bc.slice === v ? null : v); break;
       case "cust-add": setDraft("khach", "name", v); location.hash = `#/khach-moi?ve=${enc(location.hash.slice(1))}`; break;
       case "vt-material": case "vt-supplier": case "dau-supplier": {
         const [F, field] = el.dataset.action === "vt-material" ? ["vt", "material"] : [el.dataset.action.slice(0, -9), "supplier"];

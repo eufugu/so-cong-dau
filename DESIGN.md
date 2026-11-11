@@ -260,6 +260,8 @@ Product swatches (#c8102e Đỏ, #f2c230 Vàng, #fff Trắng) are content colour
 
 **The Debt Stays In Its Book Rule.** Debt appears in Sổ tiền and on customer pages, bills and new-order notes. Hôm nay never mentions it.
 
+On Sổ tiền's Khách nợ tab, once there are more than six customers, a "Tìm tên khách" search field sits under the tabs, exactly like Đơn hàng's: it ignores diacritics and case, filters both Đang nợ and Đã trả đủ as you type, and redraws only the list. Nothing found reads "Không có khách nào tên “…”."
+
 **The Printed Grid Rule.** The 22px ô ly grid pattern appears only in the header band. Empty states and table headers get the flat tint. Data never sits on the grid pattern.
 
 ## Typography
@@ -416,7 +418,7 @@ Mẹ's report for one month at a time, the current month by default. The band ti
 
 "Theo loại hàng" is a thin 3D donut drawn in inline SVG polygons, to the owner's specification. Slices start at the left and run clockwise, largest first, each pulled out 5px along its middle angle so thin gaps separate them. The ring is tilted 0.66 (hole just over half the width, walls 36 units), and the chart is at most 270px wide. A slice is drawn at least 8 degrees wide so it can be seen; its percentage stays true.
 
-All slices have the same height. Nothing is selected at first and nothing is written in the hole. Tapping a slice or a legend row lifts that slice whole, about 24px on screen and about 6px further out, with a soft black shadow of its footprint on the floor, and marks its legend row. A tap anywhere else clears the selection. This is the one shadow on a page element, by the owner's request. Each slice's lift runs on a small spring through requestAnimationFrame, so the new slice rises as the old one drops; under reduced motion it jumps to the end.
+All slices have the same height. Nothing is selected at first and nothing is written in the hole. Tapping a slice or a legend row lifts that slice whole, about 24px on screen and about 6px further out, with a soft black shadow of its footprint on the floor, and marks its legend row. Tapping the lifted slice or its legend row again drops it (so a double tap lifts and drops); legend rows use `touch-action: manipulation` so a double tap never zooms. A tap anywhere else clears the selection. This is the one shadow on a page element, by the owner's request. Each slice's lift runs on a small spring through requestAnimationFrame, so the new slice rises as the old one drops; under reduced motion it jumps to the end.
 
 To draw correctly, every slice is split at each multiple of 90 degrees and all the pieces are sorted by the sine of their middle angle, back to front. Within a piece: inner wall (back half), cut ends at the slice's real start and end only, outer wall (front half), top. Each polygon has a 0.8 stroke in its own fill to hide seams. Each colour has three shades: `--pie-N` for the top, `--pie-N-side` for the outer wall and `--pie-N-dark` for the inner wall and cut ends. There are no numbers on the chart. Percentages appear only in the legend, beside each product's name and amount.
 

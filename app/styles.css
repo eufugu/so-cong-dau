@@ -348,7 +348,7 @@ main > details.more[open] > summary { margin-bottom: 8px; }
 
 /* Đơn hàng: grouped by day, each bill says whether it is paid */
 .search { margin: 4px 16px 0; }
-.seg + .search { margin-top: 14px; }
+.seg + .search { margin-top: 22px; }
 .search .input { font-size: 1.05rem; }
 .day-head small { font-variant-numeric: tabular-nums; }
 .counts { display: inline; }

@@ -66,10 +66,14 @@ node admin/accounts.js add "Thử nghiệm"
 Other commands, for later:
 
 ```powershell
+node admin/accounts.js add "Tên người" --owner
 node admin/accounts.js reset "Tên người"
+node admin/accounts.js rename "Tên cũ" "Tên mới"
 node admin/accounts.js remove "Tên người"
 node admin/accounts.js list
 ```
+
+`--owner` gives that person the same rights as Mẹ. `rename` keeps the person and their PIN and changes the name they pick at sign-in; rows they already wrote keep the old name. Mẹ Liên cannot be renamed, because the money book matches on that exact name. After `add`, `rename` or `remove`, deploy the app again so the sign-in screen shows the new list.
 
 ## 7. Test on the iPhone
 

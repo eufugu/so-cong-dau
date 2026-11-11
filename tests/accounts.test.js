@@ -6,7 +6,7 @@ import { initializeApp, getApps, deleteApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { emailFor, validPin, cleanName } from '../admin/lib/names.js';
-import { addPerson, resetPin, removePerson, listPeople, parseArgs } from '../admin/lib/people.js';
+import { addPerson, resetPin, renamePerson, removePerson, listPeople, parseArgs } from '../admin/lib/people.js';
 
 process.env.METADATA_SERVER_DETECTION = 'none'; // no cloud lookup in tests
 const app = getApps()[0] || initializeApp({ projectId: 'demo-so-cong-dau' });
@@ -57,6 +57,10 @@ describe('parseArgs', () => {
     expect(parseArgs(['add', 'Bác Khang', '--owner'])).toMatchObject({ command: 'add', name: 'Bác Khang', owner: true });
     expect(() => parseArgs(['add', 'A', '--pin=123456'])).toThrow(/không hiểu/i);
   });
+  test('rename takes an old and a new name, other commands only one', () => {
+    expect(parseArgs(['rename', 'Thử nghiệm', 'Khang'])).toMatchObject({ command: 'rename', name: 'Thử nghiệm', newName: 'Khang' });
+    expect(() => parseArgs(['add', 'Bác', 'Khang'])).toThrow(/ngoặc kép/);
+  });
 });
 
 describe('accounts', () => {
@@ -78,11 +82,40 @@ describe('accounts', () => {
     expect((await db.collection('people').where('role', '==', 'owner').get()).size).toBe(1);
   });
 
-  test('owner must be Mẹ Liên, and only one owner', async () => {
-    await expect(addPerson(ctx(), 'Bác Khang', { owner: true })).rejects.toThrow(/Mẹ Liên/);
+  test('a second person can have the same rights as Mẹ Liên with --owner', async () => {
     await addPerson(ctx(), 'Mẹ Liên', { owner: true });
+    await addPerson(ctx(), 'Dũng', { owner: true });
+    await addPerson(ctx(), 'Ngân');
+    expect(await listPeople(ctx())).toEqual([
+      { name: 'Mẹ Liên', role: 'owner' }, { name: 'Dũng', role: 'owner' }, { name: 'Ngân', role: 'worker' }]);
     await expect(addPerson(ctx(), 'Mẹ Liên'.normalize('NFD'), { owner: true })).rejects.toThrow(/đã có/);
-    expect((await auth.listUsers()).users.length).toBe(1);
+    expect((await auth.listUsers()).users.length).toBe(3);
+  });
+
+  test('rename moves the login to the new name, keeps the person, pin and their old rows', async () => {
+    await addPerson(ctx(), 'Mẹ Liên', { owner: true });
+    await addPerson(ctx(), 'Thử nghiệm');
+    const before = await auth.getUserByEmail('thu-nghiem@so-cong-dau.invalid');
+    await db.doc('orders/o1').set({ by: 'Thử nghiệm', total: 5 });
+    expect(await renamePerson(ctx(), 'Thử nghiệm', 'Khang')).toEqual({ rows: 1 });
+    const after = await auth.getUserByEmail('khang@so-cong-dau.invalid');
+    expect(after.uid).toBe(before.uid);
+    expect(after.passwordHash).toBe(before.passwordHash);
+    expect((await db.doc(`people/${after.uid}`).get()).data()).toEqual({ name: 'Khang', role: 'worker' });
+    expect(read()).toEqual([
+      { name: 'Mẹ Liên', email: 'me-lien@so-cong-dau.invalid' }, { name: 'Khang', email: 'khang@so-cong-dau.invalid' }]);
+    expect((await db.doc('orders/o1').get()).data().by).toBe('Thử nghiệm');
+  });
+
+  test('rename refuses Mẹ Liên, an unknown name and a name already taken', async () => {
+    await addPerson(ctx(), 'Mẹ Liên', { owner: true });
+    await addPerson(ctx(), 'Ngân');
+    await addPerson(ctx(), 'Thử nghiệm');
+    await expect(renamePerson(ctx(), 'Mẹ Liên', 'Liên')).rejects.toThrow(/Không đổi được/);
+    await expect(renamePerson(ctx(), 'Ai Đó', 'Khang')).rejects.toThrow(/không có/i);
+    await expect(renamePerson(ctx(), 'Thử nghiệm', 'Ngân')).rejects.toThrow(/đã có/);
+    await expect(renamePerson(ctx(), 'Thử nghiệm', 'Ngan')).rejects.toThrow(/trùng/);
+    expect((await auth.getUserByEmail('thu-nghiem@so-cong-dau.invalid')).email).toBe('thu-nghiem@so-cong-dau.invalid');
   });
 
   test('existing name is refused, and a clashing email too', async () => {

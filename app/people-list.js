@@ -5,7 +5,15 @@ window.SO_PEOPLE = [
     "email": "me-lien@so-cong-dau.invalid"
   },
   {
-    "name": "Thử nghiệm",
-    "email": "thu-nghiem@so-cong-dau.invalid"
+    "name": "Ngân",
+    "email": "ngan@so-cong-dau.invalid"
+  },
+  {
+    "name": "Khang",
+    "email": "khang@so-cong-dau.invalid"
+  },
+  {
+    "name": "Dũng",
+    "email": "dung@so-cong-dau.invalid"
   }
 ];

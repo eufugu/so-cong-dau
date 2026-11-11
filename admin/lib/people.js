@@ -2,6 +2,7 @@
 // Nothing in this file ever prints or stores a PIN.
 import { writeFileSync } from 'node:fs';
 import { cleanName, emailFor, validPin, OWNER_NAME } from './names.js';
+import { COLLECTIONS } from './book.js';
 
 export class PlainError extends Error {}
 
@@ -10,7 +11,7 @@ const sortKey = (a, b) =>
 
 export function parseArgs(argv) {
   const [command, ...rest] = argv;
-  const out = { command, name: '', owner: false, confirmOwner: false };
+  const out = { command, name: '', newName: '', owner: false, confirmOwner: false };
   const names = [];
   for (const a of rest) {
     if (a === '--owner') out.owner = true;
@@ -18,8 +19,9 @@ export function parseArgs(argv) {
     else if (a.startsWith('--')) throw new PlainError(`Không hiểu lựa chọn "${a.split('=')[0]}".`);
     else names.push(a);
   }
-  if (names.length > 1) throw new PlainError('Hãy đặt tên trong dấu ngoặc kép, ví dụ "Bác Khang".');
+  if (names.length > (command === 'rename' ? 2 : 1)) throw new PlainError('Hãy đặt tên trong dấu ngoặc kép, ví dụ "Bác Khang".');
   out.name = cleanName(names[0]);
+  out.newName = cleanName(names[1]);
   return out;
 }
 
@@ -58,12 +60,8 @@ export async function addPerson(ctx, rawName, { owner = false } = {}) {
   if (!/^[a-z0-9-]+@/.test(email) || email.startsWith('@')) {
     throw new PlainError('Tên này không dùng được. Hãy dùng chữ cái hoặc số.');
   }
-  if (owner && name !== OWNER_NAME) {
-    throw new PlainError(`Chỉ ${OWNER_NAME} mới là chủ. Tên phải đúng là "${OWNER_NAME}".`);
-  }
   const people = await allPeople(db);
   if (people.some((p) => cleanName(p.name) === name)) throw new PlainError(`"${name}" đã có rồi.`);
-  if (owner && people.some((p) => p.role === 'owner')) throw new PlainError('Đã có chủ rồi. Chỉ được có một chủ.');
   if (people.some((p) => emailFor(p.name) === email)) {
     throw new PlainError(`Tên này trùng đăng nhập với một người khác. Hãy đổi tên một chút.`);
   }
@@ -94,6 +92,45 @@ export async function resetPin(ctx, rawName) {
   const pin = await askNewPin(ctx);
   // Firebase itself revokes refresh tokens when a password changes, so the person's other devices must sign in again with the new PIN.
   await auth.updateUser(person.uid, { password: pin });
+}
+
+// Đổi tên: đổi cả tên đăng nhập, giữ nguyên người đó và mã PIN.
+// Các dòng đã ghi trong sổ vẫn mang tên cũ; trả về số dòng như vậy để báo cho người chạy lệnh.
+export async function renamePerson(ctx, rawFrom, rawTo) {
+  const { auth, db, peopleListPath } = ctx;
+  const from = cleanName(rawFrom), to = cleanName(rawTo);
+  if (!from || !to) throw new PlainError('Thiếu tên. Ví dụ: rename "Thử nghiệm" "Khang"');
+  if (from === OWNER_NAME) throw new PlainError(`Không đổi được tên "${OWNER_NAME}": sổ tiền so theo đúng tên này.`);
+  const people = await allPeople(db);
+  const person = people.find((p) => cleanName(p.name) === from);
+  if (!person) throw new PlainError(`Không có người tên "${from}".`);
+  const email = emailFor(to);
+  if (!/^[a-z0-9-]+@/.test(email)) throw new PlainError('Tên mới không dùng được. Hãy dùng chữ cái hoặc số.');
+  if (people.some((p) => cleanName(p.name) === to)) throw new PlainError(`"${to}" đã có rồi.`);
+  if (people.some((p) => p.uid !== person.uid && emailFor(p.name) === email)) {
+    throw new PlainError('Tên mới trùng đăng nhập với một người khác. Hãy đổi tên một chút.');
+  }
+  const oldEmail = (await auth.getUser(person.uid)).email;
+  try {
+    await auth.updateUser(person.uid, { email });
+  } catch (e) {
+    if (e.code === 'auth/email-already-exists') throw new PlainError('Tên mới trùng đăng nhập với một người khác. Hãy đổi tên một chút.');
+    throw e;
+  }
+  try {
+    await db.doc(`people/${person.uid}`).update({ name: to });
+  } catch (e) {
+    try { await auth.updateUser(person.uid, { email: oldEmail }); } catch { /* best effort */ }
+    throw new PlainError('Không đổi được tên. Chưa có gì thay đổi, hãy thử lại.');
+  }
+  await writePeopleList(db, peopleListPath);
+  const old = new Set();
+  for (const c of COLLECTIONS) {
+    for (const field of c === 'payments' ? ['by', 'holder'] : ['by']) {
+      (await db.collection(c).where(field, '==', from).get()).docs.forEach((d) => old.add(`${c}/${d.id}`));
+    }
+  }
+  return { rows: old.size };
 }
 
 export async function removePerson(ctx, rawName, { confirmOwner = false } = {}) {

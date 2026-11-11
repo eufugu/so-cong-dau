@@ -674,6 +674,64 @@ test('Sản xuất: any past date from the same date box, and the row keeps that
   expect([x.date, x.cartons, x.color]).toEqual(['2026-10-05', 3, 'Vàng']);
 });
 
+test('owner deletes a mistaken bill outright, can undo it, and a worker never sees the button', async ({ page, browser, baseURL }) => {
+  const line = (id, color, cartons, status = 'Đã giao') => putDoc('orders', id, { id, date: '2026-10-05', deliver: '2026-10-05', customerId: CUST.id, customer: CUST.name, product: 'DAU-HS', color, cartons, price: 530000, status, by: 'Bác Khang', void: false });
+  await line('o-1', 'Vàng', 3); await line('o-2', 'Đỏ', 2);
+  const wk = await otherPhone(browser, baseURL, WORKER);
+  await wk.page.goto('/#/hoadon/k-t7/2026-10-05');
+  await expect(wk.page.locator('.bill-line')).toHaveCount(2);
+  await expect(wk.page.getByRole('button', { name: 'Xoá hẳn hoá đơn này' })).toHaveCount(0);
+  await wk.ctx.close();
+
+  await openAs(page, OWNER);
+  await page.goto('/#/don');
+  await page.locator('a.row', { hasText: CUST.name }).click();
+  await page.getByRole('button', { name: 'Xoá hẳn hoá đơn này' }).click();
+  await expect(page.locator('#sheet-title')).toHaveText('Xoá hẳn hoá đơn này?');
+  await expect(page.locator('.sheet')).toContainText('5 thùng');
+  await page.getByRole('button', { name: 'Giữ lại' }).click();
+  expect((await getDocs('orders')).length).toBe(2);
+
+  await page.getByRole('button', { name: 'Xoá hẳn hoá đơn này' }).click();
+  await page.getByRole('button', { name: 'Xoá hẳn', exact: true }).click();
+  await expect(page).toHaveURL(/#\/don$/);
+  await expect.poll(async () => (await getDocs('orders')).length, { timeout: 15000 }).toBe(0);
+  await expect(page.locator('#don-list')).not.toContainText(CUST.name);
+  await page.getByRole('button', { name: 'Ghi nhầm' }).click();
+  await expect.poll(async () => (await getDocs('orders')).length, { timeout: 15000 }).toBe(2);
+  await expect(page.locator('#don-list')).toContainText(CUST.name);
+
+  // Hoá đơn đã hủy cũng xoá hẳn được, để danh sách không còn dòng gạch
+  await putDoc('orders', 'o-3', { id: 'o-3', date: '2026-10-07', deliver: '2026-10-07', customerId: CUST.id, customer: CUST.name, product: 'DAU-HS', color: 'Đỏ', cartons: 1, price: 530000, status: 'Hủy', by: 'Bác Khang', void: false });
+  await page.goto('/#/hoadon/k-t7/2026-10-07/huy');
+  await page.getByRole('button', { name: 'Xoá hẳn hoá đơn này' }).click();
+  await expect(page.locator('.sheet')).not.toContainText('cộng lại vào kho');
+  await page.getByRole('button', { name: 'Xoá hẳn', exact: true }).click();
+  await expect.poll(async () => (await getDocs('orders')).map((o) => o.id).sort(), { timeout: 15000 }).toEqual(['o-1', 'o-2']);
+});
+
+test('Sổ sản xuất: every day with its cartons, who logged each line, cancelled lines struck through', async ({ page }) => {
+  const sx = (id, date, product, color, cartons, by, v = false) => putDoc('production', id, { id, date, product, color, cartons, note: '', by, void: v });
+  await sx('s-1', '2026-10-05', 'DAU-HS', 'Đỏ', 10, 'Bác Khang');
+  await sx('s-2', '2026-10-05', 'DAU-HS', 'Vàng', 4, 'Excel');
+  await sx('s-3', '2026-10-06', 'NEN-TL', '', 7, 'Bác Khang');
+  await sx('s-4', '2026-10-06', 'DAU-HS', 'Trắng', 5, 'Bác Khang', true);
+  await sx('s-5', '2026-10-05', 'DAU-CU', 'Đỏ', 2, 'Bác Khang'); // loại đã bỏ khỏi danh mục: vẫn mở được sổ
+  await openAs(page, WORKER);
+  await page.goto('/#/sx');
+  await page.getByRole('link', { name: 'Xem sổ các ngày trước' }).click();
+  await expect(page.locator('h1')).toHaveText('Sổ sản xuất');
+  await expect(page.locator('.day-head')).toHaveText([/^Thứ Ba, 06\/10\s*7 thùng$/, /^Thứ Hai, 05\/10\s*16 thùng$/]);
+  const oct5 = page.locator('section.day').nth(1);
+  await expect(oct5.locator('.row')).toHaveCount(3);
+  await expect(oct5).toContainText('DAU-CU Đỏ');
+  await expect(oct5).toContainText('Bác Khang ghi');
+  await expect(oct5).toContainText('Từ file Excel');
+  await expect(page.locator('section.day').first().locator('.row.void')).toContainText('HỦY');
+  await expect(page.locator('.tabs a[aria-current="page"]')).toHaveAttribute('data-tab', 'sx');
+  await expect(page.getByRole('link', { name: 'Quay lại' })).toHaveAttribute('href', '#/sx');
+});
+
 test('the font comes from the app itself, never from another site', async ({ page }) => {
   const outside = [];
   page.on('request', (r) => { if (/font|\.woff/.test(r.url()) && !r.url().startsWith('http://127.0.0.1:5000/')) outside.push(r.url()); });

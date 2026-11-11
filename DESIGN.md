@@ -208,13 +208,13 @@ The app is the vở ô ly the family already keeps: a white page, a lilac-blue g
 
 Density is low and type is large on purpose. The root size is 112.5% (18px). A text-size setting raises it to 125% or 140%, and every value is in rem so the whole page scales together. Tap targets start at 48px and most controls sit at 52px, 60px, 64px or 72px. The surface is flat paper. Depth comes from rules, borders and tint. The only shadows are on the two things that float: the undo toast and the bottom sheet's scrim.
 
-Status is written on, never removed. Whether something is paid has one shared badge with three states (Đã trả, Còn nợ, Chưa trả). Stock states, who holds the money and cancellations are rubber stamps: uppercase, bordered in their own colour, tilted -3deg. Cancelled entries stay on the page, struck through and stamped HỦY. The system refuses the KPI-tile dashboard: no grey cards, no tile grid, and no blue accent as decoration. Blue means a number.
+Status is written on, never removed. Whether something is paid has one shared badge with three states (Đã trả, Còn nợ, Chưa trả). Stock states, who holds the money and cancellations are rubber stamps: uppercase, bordered in their own colour, tilted -3deg. Cancelled entries stay on the page, struck through and stamped HỦY. The one exception is a bill entered by mistake: only an owner can delete it outright ("Xoá hẳn hoá đơn này", under "Hủy hoá đơn này" on a live bill and at the end of a cancelled one), after a sheet that names the customer, date, cartons and amount, with "Ghi nhầm" on the toast for 8s. The system refuses the KPI-tile dashboard: no grey cards, no tile grid, and no blue accent as decoration. Blue means a number.
 
 **Key Characteristics:**
 - White paper, with the ô ly grid pattern only in the header band
 - One faint ruled line (1px, the Ruled Line colour) dividing label from figure on every ledger list
 - Figures in pen blue, tabular numerals, right-aligned and large
-- One payment badge; rotated rubber stamps for the other states. Cancelled items are struck through, never deleted
+- One payment badge; rotated rubber stamps for the other states. Cancelled items are struck through, never deleted, except a mistaken bill an owner deletes on purpose
 - Flat surfaces, 2px borders, 10px corners, 48px+ targets
 - Scales as a whole from the root size (112.5% / 125% / 140%). Figures take their full rem size; a figure that would not fit its half of the page (right of the ruled line, or a total card) is shrunk one pixel at a time until it fits, so short numbers grow with the text setting and long ones stay whole
 
@@ -379,6 +379,9 @@ One component (`payBadge`) wherever a trip or supplier's paid state appears, wit
 
 ### Stepper
 A 72px minus/plus button pair (pen outline) flanking a 2px edge-bordered numeric input with the Counter numeral: tap it to type the count, or build it with the buttons and the +5/+10 chips (the pressed button keeps focus). If the same kind and colour was already logged today, a red notice above the stepper says how many and by whom.
+
+### Sổ sản xuất (daily production log)
+Opened from the outline "Xem sổ các ngày trước" button under "Hôm nay đã ghi" on Sản xuất (`#/sx/so`, it lights the Sản xuất tab and goes back to Sản xuất). The compact band's sub-line gives the month so far ("Tháng 11 đã làm 420 thùng"). Below, one section per day that has entries, newest day first, headed like the Order List ("Hôm nay", "Hôm qua", "Thứ Hai, 09/11") with only that day's cartons as the sub-line ("35 thùng", or "Đã bỏ hết" when every line was cancelled). Each line is a Margin Ledger row exactly as on Sản xuất: kind and colour left, cartons right, "Bác Khang ghi" (or "Từ file Excel") under the name; the person who logged it or Liên can tap it to cancel it, and a cancelled line stays in its day, struck through with the grey HỦY stamp. Fourteen days show first, then "Xem ngày cũ hơn".
 
 ### Toast and Sheet
 - **Toast:** dark ink bar fixed above the tab bar, white text, with a white-outlined "Ghi nhầm" undo button (8px radius, min 44px). It slides up 16px and fades in (.35s cubic-bezier(.16,1,.3,1), opacity .25s ease-out). It stays for 8s when undo is offered, otherwise 4s, and pauses while pointed at or focused. Swiping it sideways or down (or Esc) puts it away; a short swipe springs back.

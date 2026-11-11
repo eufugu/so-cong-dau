@@ -1180,6 +1180,14 @@
     if (save) save.textContent = sxSaveText();
     if (s) s.innerHTML = sxSub();
   }
+  // Một dòng sản xuất đã ghi: ai ghi, bao nhiêu thùng; dòng đã bỏ bị gạch đi. Người ghi hoặc Liên chạm vào để bỏ.
+  // Loại hàng không còn trong danh mục thì ghi mã của nó, để sổ cũ vẫn mở được.
+  const sxRow = (x) => row({
+    what: esc(product(x.product) ? sxLabel(product(x.product), x.color) : [x.product, x.color].filter(Boolean).join(" ")),
+    sub: x.void ? '<span class="stamp grey">HỦY</span>' : x.by === "Excel" ? "Từ file Excel" : `${esc(nameOf(x.by))} ghi`,
+    much: x.cartons, muchSub: "thùng", cls: x.void ? "void" : "",
+    action: !x.void && (isOwner() || x.by === me()) ? `data-action="sx-menu" data-id="${x.id}"` : "",
+  });
   function viewSX() {
     const p = sx.product ? product(sx.product) : null;
     const needColor = p && p.group === "Dầu";
@@ -1218,13 +1226,30 @@
     </div>` : ""}
     ${body}
     ${sx.step === 1 ? `<h2 class="sec">Hôm nay đã ghi</h2>
-    ${todays.length ? `<ul class="ledger">${todays.map((x) => row({
-      what: esc(sxLabel(product(x.product), x.color)), sub: x.void ? '<span class="stamp grey">HỦY</span>' : `${esc(nameOf(x.by))} ghi`,
-      much: x.cartons, muchSub: "thùng", cls: x.void ? "void" : "",
-      action: !x.void && (isOwner() || x.by === me()) ? `data-action="sx-menu" data-id="${x.id}"` : "",
-    })).join("")}</ul>` : `<p class="empty">Hôm nay chưa ghi gì.</p>`}
+    ${todays.length ? `<ul class="ledger">${todays.map(sxRow).join("")}</ul>` : `<p class="empty">Hôm nay chưa ghi gì.</p>`}
+    <div class="actions"><a class="btn" href="#/sx/so">Xem sổ các ngày trước</a></div>
     ${t ? `<h2 class="sec">Téc dầu</h2>
     <ul class="ledger">${row({ href: "#/kho#tec", what: "Còn", much: tanks(t.est), muchSub: "téc", cls: t.est <= 3 ? "alert" : "" })}</ul>` : ""}` : ""}`;
+  }
+
+  // ---------- Trang: Sổ sản xuất ----------
+  // Mỗi ngày một mục, ngày mới nhất trước: tổng thùng của ngày, rồi từng dòng đã ghi (dòng ghi sau nằm trên).
+  let sxLogLimit = 14;
+  function viewSXLog() {
+    const month = today().slice(0, 7);
+    const monthN = sum(live(db.production).filter((x) => x.date.slice(0, 7) === month), (x) => x.cartons);
+    const days = [];
+    [...db.production].reverse().sort((a, b) => b.date.localeCompare(a.date)).forEach((x) => {
+      const d = days[days.length - 1];
+      if (d && d.date === x.date) d.list.push(x); else days.push({ date: x.date, list: [x] });
+    });
+    return band({ title: "Sổ sản xuất", back: "#/sx", sub: monthN ? `Tháng ${mo(month)} đã làm ${num(monthN)} thùng` : `Tháng ${mo(month)} chưa ghi thùng nào` }) + (days.length
+      ? days.slice(0, sxLogLimit).map((d) => { const n = sum(live(d.list), (x) => x.cartons);
+        return `<section class="day" aria-label="${esc(dayLabel(d.date))}">
+        <h2 class="sec day-head">${esc(dayLabel(d.date))}<small>${n ? `${num(n)} thùng` : "Đã bỏ hết"}</small></h2>
+        <ul class="ledger">${d.list.map(sxRow).join("")}</ul>
+      </section>`; }).join("") + (days.length > sxLogLimit ? `<div class="actions"><button class="btn" data-action="sxlog-more">Xem ngày cũ hơn</button></div>` : "")
+      : `<p class="empty">Chưa ghi ngày nào.</p>`);
   }
 
   // ---------- Trang: Đơn hàng ----------
@@ -1330,7 +1355,7 @@
       <p class="note"><span class="stamp grey">HỦY</span> Hoá đơn này đã hủy${gone[0].voidBy ? ` (${esc(nameOf(gone[0].voidBy))})` : ""}. Hàng đã được cộng lại vào kho, khách không nợ khoản này.</p>
       <h2 class="sec">Hàng trong hoá đơn đã hủy</h2>
       <ul class="ledger bill">${its.map((it) => row({ what: esc(sxName(it.p)), sub: billLines(it), much: vnd.full(it.cartons * it.price), cls: "void" })).join("")}</ul>
-      `;
+      ${isOwner() ? `<div class="actions"><button class="link" data-action="delete-bill" data-c="${esc(id)}" data-d="${date}" data-h="1">Xoá hẳn hoá đơn này</button></div>` : ""}`;
     }
     const d = new Date(date + "T00:00:00");
     const phone = String((custById(id) || {}).phone || "").replace(/\D/g, "");
@@ -1346,7 +1371,8 @@
     })).join("")}</ul>
     <ul class="ledger sum bill">${row({ what: "Tổng cộng", sub: `${num(b.cartons)} thùng`, much: vnd.full(b.value) })}</ul>
     <div class="actions"><button class="btn" data-action="bill-copy" data-c="${esc(id)}" data-d="${date}" ${phone ? `data-phone="${phone}"` : ""}>${phone ? "Gửi Zalo" : "Chép gửi Zalo"}</button></div>
-    ${isOwner() ? `<div class="actions"><button class="link" data-action="cancel-bill" data-c="${esc(id)}" data-d="${date}">Hủy hoá đơn này</button></div>` : ""}`;
+    ${isOwner() ? `<div class="actions"><button class="link" data-action="cancel-bill" data-c="${esc(id)}" data-d="${date}">Hủy hoá đơn này</button></div>
+    <div class="actions"><button class="link" data-action="delete-bill" data-c="${esc(id)}" data-d="${date}">Xoá hẳn hoá đơn này</button></div>` : ""}`;
   }
 
   // ---------- Trang: Lên đơn mới ----------
@@ -1768,7 +1794,7 @@
       </div>`;
     if (canShare) {
       sheet(`<h2 id="sheet-title">${esc(nameOf(who.name))}</h2>
-        <p>${isOwner() ? "Máy này đang dùng tài khoản của Liên, nên có đủ quyền của Liên." : "App sẽ nhớ ai đã ghi từng dòng."}</p>
+        <p>${!isOwner() ? "App sẽ nhớ ai đã ghi từng dòng." : who.name === OWNER ? "Máy này đang dùng tài khoản của Liên, nên có đủ quyền của Liên." : "Tài khoản này có đủ quyền như Liên."}</p>
         ${sizes}
         <button class="btn block" data-action="sign-out">Đăng xuất</button>
         <div class="sheet-links"><span></span><button class="link" data-action="sheet-no">Đóng</button></div>`);
@@ -1814,6 +1840,7 @@
     else if (a === "khach-moi") { html = viewKhachForm(null, (new URLSearchParams(query || "").get("ve") || "") ? "#" + new URLSearchParams(query).get("ve") : ""); tab = "tien"; }
     else if (a === "khach" && b && c === "sua") { html = viewKhachForm(b); tab = "tien"; }
     else if (a === "khach" && b) { html = viewKhach(b); tab = "tien"; }
+    else if (a === "sx" && b === "so") { html = viewSXLog(); tab = "sx"; }
     else if (a === "sx") { html = viewSX(); tab = "sx"; }
     else if (a === "don" && b === "moi") { html = viewDonMoi(c); tab = "don"; }
     else if (a === "hoadon" && b && c) { html = viewHoaDon(b, c, parts[3] === "huy"); tab = billBack === "#/don" ? "don" : "tien"; }
@@ -2115,7 +2142,7 @@
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(ok, show); else show();
   }
 
-  const EDITS = ["handover", "recv", "recv-yes", "recv-holder", "claim", "claim-yes", "ask-next", "walk-undo", "recv-other", "recv-other-save", "pay-void", "chia-save", "pay-menu", "sx-menu", "cancel-bill", "void-menu", "import", "reset"];
+  const EDITS = ["handover", "recv", "recv-yes", "recv-holder", "claim", "claim-yes", "ask-next", "walk-undo", "recv-other", "recv-other-save", "pay-void", "chia-save", "pay-menu", "sx-menu", "cancel-bill", "delete-bill", "void-menu", "import", "reset"];
   document.addEventListener("click", (e) => {
     const go = e.target.closest("[data-go]");
     if (go) { location.hash = go.dataset.go; return; }
@@ -2305,12 +2332,27 @@
         }, true, "Giữ lại");
         break;
       }
+      // Xoá hẳn hoá đơn ghi nhầm (chỉ chủ): các dòng hàng rời khỏi sổ chung, không còn dấu HỦY. "Ghi nhầm" trên thông báo lấy lại được.
+      case "delete-bill": {
+        const cid = el.dataset.c, day = el.dataset.d, huy = el.dataset.h === "1";
+        const lines = live(db.orders).filter((o) => cidOf(o) === cid && (o.deliver || o.date) === day && o.status === (huy ? "Hủy" : "Đã giao"));
+        if (!isOwner() || !lines.length) break;
+        const ids = new Set(lines.map((o) => o.id));
+        const paid = live(db.payments).some((p) => cidOf(p) === cid && (p.alloc || []).some((a) => a.date === day));
+        confirmSheet("Xoá hẳn hoá đơn này?", `${esc(cname(cid))} · ${dm(day)} · ${num(sum(lines, (o) => o.cartons))} thùng, ${vnd.say(sum(lines, orderValue))}. Hoá đơn sẽ mất khỏi sổ của cả nhà, không còn dấu HỦY.${huy ? "" : " Hàng được cộng lại vào kho."}${paid ? " Tiền khách đã chia cho chuyến này sẽ trừ vào chuyến cũ nhất." : ""}`, "Xoá hẳn", () => {
+          db.orders = db.orders.filter((o) => !ids.has(o.id));
+          location.hash = billBack;
+          setTimeout(() => toast("Đã xoá hẳn hoá đơn.", () => { db.orders.push(...lines); }, true), 0);
+        }, true, "Giữ lại");
+        break;
+      }
       // Chép hoá đơn rồi mở luôn Zalo của khách (nếu có số điện thoại) để dán vào
       case "bill-copy":
         copyText(billText(el.dataset.c, el.dataset.d));
         if (el.dataset.phone) window.open(`https://zalo.me/${el.dataset.phone}`, "_blank", "noopener");
         break;
       case "don-more": donLimit += 30; render(); break;
+      case "sxlog-more": sxLogLimit += 14; render(); document.querySelector('[data-action="sxlog-more"]')?.focus(); break;
       case "od-cust":
         od.customer = v; od.q = ""; od.error = ""; pickOpen = v ? null : "od-cust";
         // Đổi khách khi mở từ trang của một khách: bỏ tên khách trên địa chỉ để chọn lại được

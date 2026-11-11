@@ -863,7 +863,7 @@
       const tracked = db.materials.filter((m) => materialStatus(m) !== "CHƯA THEO DÕI").sort((a, b) => ORDER.indexOf(materialStatus(a)) - ORDER.indexOf(materialStatus(b)));
       const need = tracked.filter((m) => ["HẾT", "CẦN ĐẶT"].includes(materialStatus(m))), ok = tracked.filter((m) => materialStatus(m) === "ĐỦ");
       const matRow = (m, warn) => row({ what: esc(matName(m)), sub: warn ? `<span class="stamp red">${materialStatus(m)}</span><br>tối thiểu ${num(m.min)}` : "", much: num(materialStock(m)), muchSub: esc(m.unit), cls: warn ? "alert" : "" });
-      return `<h2 class="sec" id="vattu">Vật tư cần đặt <small>${need.length ? `${need.length} loại` : "không có loại nào"}</small></h2>
+      return `<h2 class="sec" id="vattu">Vật tư cần đặt <small>${need.length ? `${need.length} loại` : "Không có loại nào"}</small></h2>
       ${need.length ? `<ul class="ledger">${need.map((m) => matRow(m, true)).join("")}</ul>` : `<p class="empty">Vật tư đều còn đủ.</p>`}
       ${ok.length ? `<details class="more"><summary>Vật tư còn đủ (${ok.length} loại)</summary><ul class="ledger">${ok.map((m) => matRow(m, false)).join("")}</ul></details>` : ""}`;
     })()}
@@ -941,7 +941,7 @@
       ${g.items.length > 1 ? `<p class="note">Chạm từng dòng để xác nhận riêng khoản đó.</p>` : ""}`}
     `).join("") + (isOwner() ? "" : `<p class="info">${sync === "local" ? "Đưa tiền cho Liên xong, đưa máy cho Liên bấm “Liên đã nhận”." : "Đưa tiền cho Liên xong, Liên sẽ bấm “Liên đã nhận” trên điện thoại của Liên."}</p>`)
       : `<p class="empty">Tiền khách trả đã về tay Liên hết. Không ai đang cầm hộ.</p>`}
-    <h2 class="sec">Đã về tay Liên <small>${handed.length >= 20 ? "20 lần gần nhất" : "gần đây"}</small></h2>
+    <h2 class="sec">Đã về tay Liên <small>${handed.length >= 20 ? "20 lần gần nhất" : "Gần đây"}</small></h2>
     ${handed.length ? `<ul class="ledger">${handed.map((p) => row({
       href: `#/khach/${enc(cidOf(p))}`, what: esc(cname(cidOf(p))),
       sub: `${dm(p.date)}${p.void ? ' · <span class="stamp grey">HỦY</span>' : p.holder === "Tài khoản Mẹ" ? ` · <span class="stamp pen${fr(p.id)}">TÀI KHOẢN LIÊN</span>` : ""}`,

@@ -152,8 +152,8 @@
   function describeRow(col, r) {
     try {
       if (col === "payments") return `Tiền khách trả: ${cname(cidOf(r))}, ${vnd.say(r.amount)}`;
-      if (col === "orders") return `Đơn hàng: ${cname(cidOf(r))}, ${num(r.cartons)} thùng`;
-      if (col === "production") return `Sản xuất: ${sxLabel(product(r.product), r.color)}, ${num(r.cartons)} thùng`;
+      if (col === "orders") return `Đơn hàng: ${cname(cidOf(r))}, ${num(r.cartons)} ${unitOf(r.product)}`;
+      if (col === "production") return `Sản xuất: ${sxLabel(product(r.product), r.color)}, ${num(r.cartons)} ${unitOf(r.product)}`;
       if (col === "customers") return `Khách mới: ${r.name}`;
       if (col === "supplierPays") return `Tiền trả nhà cung cấp: ${r.supplier}, ${vnd.say(r.amount)}`;
     } catch (e) { /* dùng mô tả chung */ }
@@ -301,6 +301,16 @@
   // Tên gọi trong xưởng dùng ở Sản xuất và Đơn hàng
   const sxName = (p) => CALLED[p.code] || shortName(p);
   const sxLabel = (p, color) => (color ? `${sxName(p)} ${color}` : sxName(p));
+  // Nến làm và bán theo hộp, vỉ; trong kho vẫn đếm là thùng
+  const UNIT = { "NEN-SH": "hộp", "NEN-TL": "vỉ" };
+  const unitOf = (code) => UNIT[code] || "thùng";
+  // Cộng số lượng theo từng đơn vị: "20 thùng, 3 hộp". Thùng luôn đứng trước.
+  function qtyText(list, n = (x) => x.cartons, code = (x) => x.product) {
+    const by = new Map([["thùng", 0]]);
+    list.forEach((x) => { const u = unitOf(code(x)); by.set(u, (by.get(u) || 0) + n(x)); });
+    const parts = [...by].filter(([, v]) => v).map(([u, v]) => `${num(v)} ${u}`);
+    return parts.length ? parts.join(", ") : "0 thùng";
+  }
   // Can cũng gọi theo tên trong xưởng: "Can 1.5 kg" là "Can 2L"
   const matName = (m) => { if (!m) return ""; const k = String(m.code).match(/^CAN-(.+)$/); const n = k && CALLED["DAU-" + k[1]]; return !n ? vnDec(m.name) : / can$/.test(n) ? `${vnDec(m.name)} (thùng ${n})` : `Can ${n}`; };
   const live = (arr) => arr.filter((x) => !x.void);
@@ -1168,10 +1178,10 @@
   const swatch = (c, cls = "") => `<span class="swatch ${SWATCH[c]} ${cls}" aria-hidden="true"></span>`;
   const sxDate = () => sx.date || today();
   const sxSaveText = () => (sxDate() === today() ? "Lưu hàng" : `Lưu cho ngày ${dm(sxDate())}`);
-  const sxSub = () => { const d = sx.step === 3 ? sxDate() : today(); return `${d === today() ? `Hôm nay ${dm(d)}` : `Đang ghi cho ngày <b>${dm(d)}</b>`} · đã ghi ${num(sum(madeOn(d), (x) => x.cartons))} thùng`; };
+  const sxSub = () => { const d = sx.step === 3 ? sxDate() : today(); return `${d === today() ? `Hôm nay ${dm(d)}` : `Đang ghi cho ngày <b>${dm(d)}</b>`} · ${madeOn(d).length ? `đã ghi ${qtyText(madeOn(d))}` : "chưa ghi gì"}`; };
   function sxDup() {
     const d = sxDate(), dup = madeOn(d).filter((x) => x.product === sx.product && (x.color || "") === (sx.color || ""));
-    return dup.length ? `<p class="info">${d === today() ? "Hôm nay" : `Ngày ${dm(d)}`} đã ghi ${num(sum(dup, (x) => x.cartons))} thùng loại này rồi${dup.some((x) => x.by) ? ` (${[...new Set(dup.map((x) => nameOf(x.by)).filter(Boolean))].map(esc).join(", ")})` : ""}.</p>` : "";
+    return dup.length ? `<p class="info">${d === today() ? "Hôm nay" : `Ngày ${dm(d)}`} đã ghi ${num(sum(dup, (x) => x.cartons))} ${unitOf(sx.product)} loại này rồi${dup.some((x) => x.by) ? ` (${[...new Set(dup.map((x) => nameOf(x.by)).filter(Boolean))].map(esc).join(", ")})` : ""}.</p>` : "";
   }
   // Đổi ngày chỉ đổi chữ, không vẽ lại trang: vẽ lại sẽ làm tắt bảng lịch của máy đang mở
   function refreshSX() {
@@ -1180,12 +1190,12 @@
     if (save) save.textContent = sxSaveText();
     if (s) s.innerHTML = sxSub();
   }
-  // Một dòng sản xuất đã ghi: ai ghi, bao nhiêu thùng; dòng đã bỏ bị gạch đi. Người ghi hoặc Liên chạm vào để bỏ.
+  // Một dòng sản xuất đã ghi: ai ghi, bao nhiêu thùng (nến: hộp, vỉ); dòng đã bỏ bị gạch đi. Người ghi hoặc Liên chạm vào để bỏ.
   // Loại hàng không còn trong danh mục thì ghi mã của nó, để sổ cũ vẫn mở được.
   const sxRow = (x) => row({
     what: esc(product(x.product) ? sxLabel(product(x.product), x.color) : [x.product, x.color].filter(Boolean).join(" ")),
     sub: x.void ? '<span class="stamp grey">HỦY</span>' : x.by === "Excel" ? "Từ file Excel" : `${esc(nameOf(x.by))} ghi`,
-    much: x.cartons, muchSub: "thùng", cls: x.void ? "void" : "",
+    much: x.cartons, muchSub: unitOf(x.product), cls: x.void ? "void" : "",
     action: !x.void && (isOwner() || x.by === me()) ? `data-action="sx-menu" data-id="${x.id}"` : "",
   });
   function viewSX() {
@@ -1204,14 +1214,15 @@
         ${COLORS.map((c) => `<button type="button" class="choice color" data-action="sx-color" data-v="${c}">${swatch(c, "big")}<span class="cname">${c}</span></button>`).join("")}
       </div></div>`;
     } else {
-      body = `<h2 class="sec">3. Bao nhiêu thùng?</h2>
+      const u = unitOf(sx.product);
+      body = `<h2 class="sec">3. Bao nhiêu ${u}?</h2>
       <div class="form">
         ${dateField("sx-date", "date", "Ngày làm", sxDate(), today())}
         <div id="sx-dup">${sxDup()}</div>
         <div class="stepper">
-          <button type="button" data-action="sx-step" data-v="-1" aria-label="Bớt 1 thùng">${ICON.minus}</button>
-          <input class="count-in" id="sx-n" inputmode="numeric" pattern="[0-9]*" autocomplete="off" aria-label="Số thùng" placeholder="0" value="${sx.cartons || ""}">
-          <button type="button" data-action="sx-step" data-v="1" aria-label="Thêm 1 thùng">${ICON.plus}</button>
+          <button type="button" data-action="sx-step" data-v="-1" aria-label="Bớt 1 ${u}">${ICON.minus}</button>
+          <input class="count-in" id="sx-n" inputmode="numeric" pattern="[0-9]*" autocomplete="off" aria-label="Số ${u}" placeholder="0" value="${sx.cartons || ""}">
+          <button type="button" data-action="sx-step" data-v="1" aria-label="Thêm 1 ${u}">${ICON.plus}</button>
         </div>
         <div class="chips two">${[5, 10].map((n) => `<button type="button" class="chip" data-action="sx-step" data-v="${n}">+${n}</button>`).join("")}</div>
         <div class="save-bar"><button class="btn primary block" id="sx-save" data-action="sx-save" ${sx.cartons ? "" : "disabled"}>${sxSaveText()}</button></div>
@@ -1237,16 +1248,16 @@
   let sxLogLimit = 14;
   function viewSXLog() {
     const month = today().slice(0, 7);
-    const monthN = sum(live(db.production).filter((x) => x.date.slice(0, 7) === month), (x) => x.cartons);
+    const monthL = live(db.production).filter((x) => x.date.slice(0, 7) === month);
     const days = [];
     [...db.production].reverse().sort((a, b) => b.date.localeCompare(a.date)).forEach((x) => {
       const d = days[days.length - 1];
       if (d && d.date === x.date) d.list.push(x); else days.push({ date: x.date, list: [x] });
     });
-    return band({ title: "Sổ sản xuất", back: "#/sx", sub: monthN ? `Tháng ${mo(month)} đã làm ${num(monthN)} thùng` : `Tháng ${mo(month)} chưa ghi thùng nào` }) + (days.length
-      ? days.slice(0, sxLogLimit).map((d) => { const n = sum(live(d.list), (x) => x.cartons);
+    return band({ title: "Sổ sản xuất", back: "#/sx", sub: monthL.length ? `Tháng ${mo(month)} đã làm ${qtyText(monthL)}` : `Tháng ${mo(month)} chưa ghi gì` }) + (days.length
+      ? days.slice(0, sxLogLimit).map((d) => { const n = live(d.list);
         return `<section class="day" aria-label="${esc(dayLabel(d.date))}">
-        <h2 class="sec day-head">${esc(dayLabel(d.date))}<small>${n ? `${num(n)} thùng` : "Đã bỏ hết"}</small></h2>
+        <h2 class="sec day-head">${esc(dayLabel(d.date))}<small>${n.length ? qtyText(n) : "Đã bỏ hết"}</small></h2>
         <ul class="ledger">${d.list.map(sxRow).join("")}</ul>
       </section>`; }).join("") + (days.length > sxLogLimit ? `<div class="actions"><button class="btn" data-action="sxlog-more">Xem ngày cũ hơn</button></div>` : "")
       : `<p class="empty">Chưa ghi ngày nào.</p>`);
@@ -1316,7 +1327,7 @@
     const by = new Map();
     lines.forEach((o) => {
       const k = `${o.product}|${o.price}`;
-      if (!by.has(k)) by.set(k, { p: product(o.product), price: o.price, colors: new Map(), cartons: 0 });
+      if (!by.has(k)) by.set(k, { p: product(o.product), code: o.product, price: o.price, colors: new Map(), cartons: 0 });
       const it = by.get(k);
       it.colors.set(o.color, (it.colors.get(o.color) || 0) + o.cartons);
       it.cartons += o.cartons;
@@ -1324,23 +1335,23 @@
     return [...by.values()].filter((it) => it.p).sort((a, b) => db.products.indexOf(a.p) - db.products.indexOf(b.p) || a.price - b.price);
   }
   // Màu luôn có tên: chấm màu, số thùng, tên màu
-  const colorList = (pairs) => pairs.filter(([, n]) => n > 0).sort((a, b) => COLORS.indexOf(a[0]) - COLORS.indexOf(b[0]))
-    .map(([c, n]) => (c ? `<span class="nw">${swatch(c, "sm")}${n} ${c}</span>` : `<span class="nw">${n} thùng</span>`)).join('<span class="sr-only">, </span>');
+  const colorList = (pairs, u = "thùng") => pairs.filter(([, n]) => n > 0).sort((a, b) => COLORS.indexOf(a[0]) - COLORS.indexOf(b[0]))
+    .map(([c, n]) => (c ? `<span class="nw">${swatch(c, "sm")}${n} ${c}</span>` : `<span class="nw">${n} ${u}</span>`)).join('<span class="sr-only">, </span>');
   // Mỗi màu một dòng: chấm màu, số thùng, màu, giá. Hàng không có màu thì chỉ số thùng và giá.
   const billLines = (it) => [...it.colors].filter(([, n]) => n > 0).sort((a, b) => COLORS.indexOf(a[0]) - COLORS.indexOf(b[0]))
-    .map(([c, n]) => `<span class="bill-line">${c ? `${swatch(c, "sm")}${n} ${c.toLowerCase()}` : n} × ${vnd.full(it.price)}</span>`).join("");
+    .map(([c, n]) => `<span class="bill-line">${c ? `${swatch(c, "sm")}${n} ${c.toLowerCase()}` : `${n} ${unitOf(it.code)}`} × ${vnd.full(it.price)}</span>`).join("");
   function bill(id, date) {
     const lines = live(db.orders).filter((o) => cidOf(o) === id && (o.deliver || o.date) === date && o.status === "Đã giao");
     const items = billItems(lines);
     const trip = customer(id).trips.find((t) => t.date === date);
-    return { lines, items, cartons: sum(items, (it) => it.cartons), value: sum(items, (it) => it.cartons * it.price), owed: trip ? trip.owed : 0 };
+    return { lines, items, cartons: sum(items, (it) => it.cartons), qty: qtyText(items, (it) => it.cartons, (it) => it.code), value: sum(items, (it) => it.cartons * it.price), owed: trip ? trip.owed : 0 };
   }
   // Hoá đơn dạng chữ để dán vào Zalo
   function billText(id, date) {
     const b = bill(id, date);
     return [`Hoá đơn ngày ${dmy(date)}`, `Khách: ${cname(id)}`, "",
-      ...b.items.map((it) => `${sxName(it.p)} (${[...it.colors].map(([c, n]) => (c ? `${n} ${c}` : `${n}`)).join(", ")}): ${it.cartons} thùng × ${vnd.full(it.price)} = ${vnd.full(it.cartons * it.price)}`), "",
-      `Tổng: ${num(b.cartons)} thùng, ${vnd.say(b.value)}`,
+      ...b.items.map((it) => `${sxName(it.p)} (${[...it.colors].map(([c, n]) => (c ? `${n} ${c}` : `${n}`)).join(", ")}): ${it.cartons} ${unitOf(it.code)} × ${vnd.full(it.price)} = ${vnd.full(it.cartons * it.price)}`), "",
+      `Tổng: ${b.qty}, ${vnd.say(b.value)}`,
       b.owed <= 0 ? "Đã trả đủ." : b.owed < b.value ? `Còn nợ: ${vnd.say(b.owed)}` : `Chưa trả: ${vnd.say(b.owed)}`].join("\n");
   }
 
@@ -1369,7 +1380,7 @@
     <ul class="ledger bill">${b.items.map((it) => row({
       what: esc(sxName(it.p)), sub: billLines(it), much: vnd.full(it.cartons * it.price),
     })).join("")}</ul>
-    <ul class="ledger sum bill">${row({ what: "Tổng cộng", sub: `${num(b.cartons)} thùng`, much: vnd.full(b.value) })}</ul>
+    <ul class="ledger sum bill">${row({ what: "Tổng cộng", sub: b.qty, much: vnd.full(b.value) })}</ul>
     <div class="actions"><button class="btn" data-action="bill-copy" data-c="${esc(id)}" data-d="${date}" ${phone ? `data-phone="${phone}"` : ""}>${phone ? "Gửi Zalo" : "Chép gửi Zalo"}</button></div>
     ${isOwner() ? `<div class="actions"><button class="link" data-action="cancel-bill" data-c="${esc(id)}" data-d="${date}">Hủy hoá đơn này</button></div>
     <div class="actions"><button class="link" data-action="delete-bill" data-c="${esc(id)}" data-d="${date}">Xoá hẳn hoá đơn này</button></div>` : ""}`;
@@ -1379,8 +1390,20 @@
   // Một tờ đơn để điền: mỗi hàng một loại, mỗi cột một màu, gõ số thùng vào ô.
   // Tổng tiền và nút lưu luôn nằm sát dưới tay, không phải cuộn xuống tìm.
   let od = null;
+  // od.price chỉ giữ giá Mẹ tự sửa trên tờ đơn này; còn lại lấy giá đơn trước của khách, rồi mới tới giá chung
   function newOrderDraft(id) { return { customer: id || "", q: "", qty: {}, price: {}, editPrice: false, date: today(), error: "" }; }
-  const odPrice = (p) => od.price[p.code] || p.price;
+  const odPrice = (p) => od.price[p.code] || (od.customer && lastPrices(od.customer)[p.code]) || p.price;
+  // Giá đơn trước của khách cho từng loại hàng (chuyến mới nhất thắng)
+  function lastPrices(cid) {
+    const out = {}, when = {};
+    live(db.orders).forEach((o) => {
+      if (cidOf(o) !== cid || o.status !== "Đã giao" || !o.price) return;
+      const d = o.deliver || o.date;
+      if (!(o.product in when) || d >= when[o.product]) { when[o.product] = d; out[o.product] = o.price; }
+    });
+    return out;
+  }
+  const odKeptPrice = () => od.customer && Object.entries(lastPrices(od.customer)).some(([code, pr]) => !od.price[code] && product(code) && pr !== product(code).price);
   const odLines = () => Object.entries(od.qty).filter(([, n]) => n > 0).map(([k, n]) => {
     const [code, color] = k.split("|");
     return { p: product(code), color, cartons: n };
@@ -1395,14 +1418,14 @@
   function orderRow(p) {
     const cols = colorsOf(p);
     const priceCell = isOwner() && od.editPrice
-      ? `<input class="price-in" data-price="${p.code}" inputmode="numeric" autocomplete="off" aria-label="Giá mỗi thùng ${esc(sxName(p))}" value="${vnd.full(odPrice(p))}">`
+      ? `<input class="price-in" data-price="${p.code}" inputmode="numeric" autocomplete="off" aria-label="Giá mỗi ${unitOf(p.code)} ${esc(sxName(p))}" value="${vnd.full(odPrice(p))}">`
       : `<small>${vnd.full(odPrice(p))}</small>`;
     return `<div class="os-row${cols.length === 1 ? " one" : ""}">
       <div class="os-name"><strong>${esc(sxName(p))}</strong>${priceCell}</div>
       ${cols.map((c) => {
         const k = `${p.code}|${c}`, n = od.qty[k] || 0;
         return `<input class="cell${n > stock(p.code, c) ? " over" : ""}${n ? " filled" : ""}" data-k="${k}" inputmode="numeric" pattern="[0-9]*" autocomplete="off"
-          aria-label="${esc(sxName(p))}${c ? " " + c : ""}, số thùng" value="${n || ""}">`;
+          aria-label="${esc(sxName(p))}${c ? " " + c : ""}, số ${unitOf(p.code)}" value="${n || ""}">`;
       }).join("")}
     </div>`;
   }
@@ -1416,7 +1439,7 @@
     return `<h2 class="sec sub">Đơn này</h2>
     <ul class="ledger">${[...byP].map(([p, ls]) => row({
       what: esc(sxName(p)),
-      sub: `<span class="counts">${colorList(ls.map((l) => [l.color, l.cartons]))}</span><br>${num(sum(ls, (l) => l.cartons))} thùng × ${vnd.full(odPrice(p))}`,
+      sub: `<span class="counts">${colorList(ls.map((l) => [l.color, l.cartons]), unitOf(p.code))}</span><br>${num(sum(ls, (l) => l.cartons))} ${unitOf(p.code)} × ${vnd.full(odPrice(p))}`,
       much: vnd.full(sum(ls, (l) => l.cartons) * odPrice(p)),
     })).join("")}</ul>
     ${over.length ? `<p class="warn">Kho không đủ: ${over.map((l) => `${esc(sxLabel(l.p, l.color))} còn ${num(Math.max(0, stock(l.p.code, l.color)))}`).join(", ")}.</p>` : ""}`;
@@ -1425,8 +1448,8 @@
   function orderBar() {
     const lines = odLines(), cartons = sum(lines, (l) => l.cartons), value = sum(lines, (l) => l.cartons * odPrice(l.p));
     const over = lines.filter((l) => l.cartons > stock(l.p.code, l.color));
-    const note = over.length === 1 ? `<small class="due">Kho thiếu ${num(over[0].cartons - Math.max(0, stock(over[0].p.code, over[0].color)))} thùng ${esc(sxLabel(over[0].p, over[0].color))}</small>`
-      : over.length ? `<small class="due">Kho thiếu ${over.length} loại</small>` : `<small>${od.customer ? esc(cname(od.customer)) : "Chưa chọn khách"}${cartons ? ` · ${num(cartons)} thùng` : ""}</small>`;
+    const note = over.length === 1 ? `<small class="due">Kho thiếu ${num(over[0].cartons - Math.max(0, stock(over[0].p.code, over[0].color)))} ${unitOf(over[0].p.code)} ${esc(sxLabel(over[0].p, over[0].color))}</small>`
+      : over.length ? `<small class="due">Kho thiếu ${over.length} loại</small>` : `<small>${od.customer ? esc(cname(od.customer)) : "Chưa chọn khách"}${cartons ? ` · ${qtyText(lines, (l) => l.cartons, (l) => l.p.code)}` : ""}</small>`;
     return `<div class="od-total"><b>${cartons ? vnd.full(value) : '<span class="none">Chưa có hàng</span>'}</b>${note}</div>
       <button class="btn primary" type="submit" ${cartons ? "" : "aria-disabled=\"true\""}>Lưu đơn</button>`;
   }
@@ -1449,8 +1472,9 @@
       ${dateField("od-date", "date", "Ngày giao", od.date)}
       <div class="field">${custField(c, "od-cust", "od-q", "Khách")}</div>
       ${c && c.debt > 0 ? `<p class="info">${esc(c.name)} còn nợ <b>${vnd.say(c.debt)}</b>${owed.length ? ` từ chuyến ${dm(owed[0].date)}` : ""}. Nhớ hỏi tiền chuyến trước.</p>` : ""}
+      ${odKeptPrice() ? `<p class="info">Giá giữ như đơn trước của ${esc(c.name)}.</p>` : ""}
       <div class="field">
-        <div class="label-row"><span class="label">Số thùng</span>${isOwner() ? `<button type="button" class="link" data-action="od-edit-price" aria-pressed="${od.editPrice}">${od.editPrice ? "Xong sửa giá" : "Sửa giá"}</button>` : ""}</div>
+        <div class="label-row"><span class="label">Số lượng</span>${isOwner() ? `<button type="button" class="link" data-action="od-edit-price" aria-pressed="${od.editPrice}">${od.editPrice ? "Xong sửa giá" : "Sửa giá"}</button>` : ""}</div>
         <div class="order-sheet">${head}${usual.map(orderRow).join("")}</div>
         ${rare.length ? `<details class="more"${rare.some((p) => colorsOf(p).some((col) => od.qty[`${p.code}|${col}`] > 0)) ? " open" : ""}>
           <summary>Loại khác</summary><div class="order-sheet">${head}${rare.map(orderRow).join("")}</div></details>` : ""}
@@ -1825,6 +1849,7 @@
     return { parts, anchor };
   }
 
+  let lastDrawn = "";
   function render() {
     if (gate !== "ok") { renderGate(); return; }
     document.body.classList.remove("gated");
@@ -1852,7 +1877,11 @@
     const main = document.getElementById("main");
     // Danh sách khách đang cuộn dở thì giữ nguyên chỗ khi trang vẽ lại (số mới từ sổ chung về giữa chừng)
     const cp = main.querySelector(".pick-wrap .cp-list:not([hidden])"), cpTop = cp ? cp.scrollTop : 0, cpId = cp ? cp.id : "";
+    // Mục "Loại khác" đang mở thì vẫn mở khi vẽ lại cùng trang, không thì ô vừa định gõ biến mất
+    const wasOpen = lastDrawn === location.hash ? [...main.querySelectorAll("details")].map((d) => d.open) : [];
+    lastDrawn = location.hash;
     main.innerHTML = html;
+    main.querySelectorAll("details").forEach((d, i) => { if (wasOpen[i]) d.open = true; });
     main.classList.toggle("picking", !!(pickOpen && main.querySelector(`[data-picker="${pickOpen}"]`)));
     if (cpTop) { const again = document.getElementById(cpId); if (again) again.scrollTop = cpTop; }
     const h1 = main.querySelector("h1");
@@ -2046,7 +2075,7 @@
   function saveOrder(f, sure) {
     const lines = odLines();
     if (!od.customer) { od.error = "Chưa chọn khách. Chọn tên khách ở ô trên cùng."; return render(); }
-    if (!lines.length) { od.error = "Chưa có hàng nào. Gõ số thùng vào ô."; return render(); }
+    if (!lines.length) { od.error = "Chưa có hàng nào. Gõ số lượng vào ô."; return render(); }
     // Đặt nhiều hơn số trong kho: hỏi lại, vì có thể gõ nhầm, cũng có thể kho trong máy chưa đúng
     const over = lines.filter((l) => l.cartons > stock(l.p.code, l.color));
     if (over.length && !sure) {
@@ -2061,7 +2090,7 @@
     made.forEach((o) => addRec("orders", o)); save();
     const id = od.customer, ids = new Set(made.map((o) => o.id)); od = null;
     location.hash = billHref(id, day);
-    toast(`Đã giao ${num(sum(made, (o) => o.cartons))} thùng cho ${cname(id)}.`, () => { db.orders = db.orders.filter((x) => !ids.has(x.id)); });
+    toast(`Đã giao ${qtyText(made)} cho ${cname(id)}.`, () => { db.orders = db.orders.filter((x) => !ids.has(x.id)); });
   }
 
   function saveTra() {
@@ -2312,12 +2341,12 @@
         addRec("production", x); save();
         sx = { step: 1, product: null, color: null, cartons: 0 };
         render();
-        toast(`Đã lưu ${x.cartons} thùng ${sxLabel(product(x.product), x.color)}${x.date === today() ? "" : ` cho ngày ${dm(x.date)}`}.`, () => { db.production = db.production.filter((y) => y.id !== x.id); });
+        toast(`Đã lưu ${x.cartons} ${unitOf(x.product)} ${sxLabel(product(x.product), x.color)}${x.date === today() ? "" : ` cho ngày ${dm(x.date)}`}.`, () => { db.production = db.production.filter((y) => y.id !== x.id); });
         break;
       }
       case "sx-menu": {
         const x = db.production.find((y) => y.id === id);
-        confirmSheet("Bỏ dòng này?", `${x.cartons} thùng ${esc(sxLabel(product(x.product), x.color))}. Dòng này sẽ bị gạch đi và kho tự tính lại.`, "Bỏ dòng này", () => {
+        confirmSheet("Bỏ dòng này?", `${x.cartons} ${unitOf(x.product)} ${esc(sxLabel(product(x.product), x.color))}. Dòng này sẽ bị gạch đi và kho tự tính lại.`, "Bỏ dòng này", () => {
           x.void = true; x.voidBy = me();
           setTimeout(() => toast("Đã bỏ dòng.", () => { x.void = false; }, true), 0);
         }, true, "Giữ lại");
@@ -2325,7 +2354,7 @@
       }
       case "cancel-bill": {
         const cid = el.dataset.c, day = el.dataset.d, lines = bill(cid, day).lines;
-        confirmSheet("Hủy hoá đơn này?", `${esc(cname(cid))} · ${dm(day)} · ${num(sum(lines, (o) => o.cartons))} thùng, ${vnd.say(sum(lines, orderValue))}. Hàng sẽ được cộng lại vào kho.`, "Hủy hoá đơn", () => {
+        confirmSheet("Hủy hoá đơn này?", `${esc(cname(cid))} · ${dm(day)} · ${qtyText(lines)}, ${vnd.say(sum(lines, orderValue))}. Hàng sẽ được cộng lại vào kho.`, "Hủy hoá đơn", () => {
           lines.forEach((o) => { o.status = "Hủy"; o.voidBy = me(); });
           location.hash = "#/don";
           setTimeout(() => toast("Đã hủy hoá đơn.", () => lines.forEach((o) => { o.status = "Đã giao"; }), true), 0);
@@ -2339,7 +2368,7 @@
         if (!isOwner() || !lines.length) break;
         const ids = new Set(lines.map((o) => o.id));
         const paid = live(db.payments).some((p) => cidOf(p) === cid && (p.alloc || []).some((a) => a.date === day));
-        confirmSheet("Xoá hẳn hoá đơn này?", `${esc(cname(cid))} · ${dm(day)} · ${num(sum(lines, (o) => o.cartons))} thùng, ${vnd.say(sum(lines, orderValue))}. Hoá đơn sẽ mất khỏi sổ của cả nhà, không còn dấu HỦY.${huy ? "" : " Hàng được cộng lại vào kho."}${paid ? " Tiền khách đã chia cho chuyến này sẽ trừ vào chuyến cũ nhất." : ""}`, "Xoá hẳn", () => {
+        confirmSheet("Xoá hẳn hoá đơn này?", `${esc(cname(cid))} · ${dm(day)} · ${qtyText(lines)}, ${vnd.say(sum(lines, orderValue))}. Hoá đơn sẽ mất khỏi sổ của cả nhà, không còn dấu HỦY.${huy ? "" : " Hàng được cộng lại vào kho."}${paid ? " Tiền khách đã chia cho chuyến này sẽ trừ vào chuyến cũ nhất." : ""}`, "Xoá hẳn", () => {
           db.orders = db.orders.filter((o) => !ids.has(o.id));
           location.hash = billBack;
           setTimeout(() => toast("Đã xoá hẳn hoá đơn.", () => { db.orders.push(...lines); }, true), 0);

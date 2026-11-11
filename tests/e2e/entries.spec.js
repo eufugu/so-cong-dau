@@ -721,7 +721,7 @@ test('Sổ sản xuất: every day with its cartons, who logged each line, cance
   await page.goto('/#/sx');
   await page.getByRole('link', { name: 'Xem sổ các ngày trước' }).click();
   await expect(page.locator('h1')).toHaveText('Sổ sản xuất');
-  await expect(page.locator('.day-head')).toHaveText([/^Thứ Ba, 06\/10\s*7 thùng$/, /^Thứ Hai, 05\/10\s*16 thùng$/]);
+  await expect(page.locator('.day-head')).toHaveText([/^Thứ Ba, 06\/10\s*7 vỉ$/, /^Thứ Hai, 05\/10\s*16 thùng$/]);
   const oct5 = page.locator('section.day').nth(1);
   await expect(oct5.locator('.row')).toHaveCount(3);
   await expect(oct5).toContainText('DAU-CU Đỏ');
@@ -730,6 +730,91 @@ test('Sổ sản xuất: every day with its cartons, who logged each line, cance
   await expect(page.locator('section.day').first().locator('.row.void')).toContainText('HỦY');
   await expect(page.locator('.tabs a[aria-current="page"]')).toHaveAttribute('data-tab', 'sx');
   await expect(page.getByRole('link', { name: 'Quay lại' })).toHaveAttribute('href', '#/sx');
+});
+
+test('Lên đơn: picking a customer keeps the price of their last order; a new customer gets the list price', async ({ page }) => {
+  const order = (id, day, product, price) => putDoc('orders', id, { id, date: day, deliver: day, customerId: CUST.id, customer: CUST.name, product, color: 'Đỏ', cartons: 1, price, status: 'Đã giao', by: 'Excel', void: false });
+  await order('o-old', '2026-09-01', 'DAU-0.5', 350000);
+  await order('o-new', '2026-10-01', 'DAU-0.5', 380000);
+  await putDoc('orders', 'o-gone', { id: 'o-gone', date: '2026-10-03', deliver: '2026-10-03', customerId: CUST.id, customer: CUST.name, product: 'DAU-0.5', color: 'Đỏ', cartons: 1, price: 999000, status: 'Hủy', by: 'Excel', void: false });
+  await putDoc('customers', 'k-m', { id: 'k-m', name: 'Cậu Minh', phone: '', address: '', by: 'Excel', void: false });
+  await openAs(page, WORKER);
+  const price1L = page.locator('.os-row', { has: page.locator('strong', { hasText: /^1L$/ }) }).locator('.os-name small');
+  // Mở thẳng từ trang của khách, kể cả khi sổ chung vừa mới về
+  await page.reload();
+  await page.goto(`/#/don/moi/${CUST.id}`);
+  await expect(price1L).toHaveText('380.000');
+  await page.goto('/#/don');
+  await page.goto('/#/don/moi');
+  await page.locator('.picked button').click();
+  await expect(price1L).toHaveText('360.000');
+  await page.locator('#od-q').fill('Khach Thu');
+  await page.locator('#od-q').press('Enter');
+  await expect(price1L).toHaveText('380.000');
+  await expect(page.locator('.order-form')).toContainText('Giá giữ như đơn trước của Khách Thử.');
+  // Đổi sang khách chưa mua bao giờ: về giá chung
+  await page.locator('.picked button').click();
+  await page.locator('#od-q').fill('Cau Minh');
+  await page.locator('#od-q').press('Enter');
+  await expect(price1L).toHaveText('360.000');
+  await expect(page.locator('.order-form')).not.toContainText('Giá giữ như đơn trước');
+  // Quay lại khách cũ và lưu: dòng hàng mang giá lần trước
+  await page.locator('.picked button').click();
+  await page.locator('#od-q').fill('Khach Thu');
+  await page.locator('#od-q').press('Enter');
+  await page.getByRole('textbox', { name: '1L Vàng, số thùng', exact: true }).fill('2');
+  await page.getByRole('button', { name: 'Lưu đơn' }).click();
+  await expect.poll(async () => (await getDocs('orders')).length, { timeout: 15000 }).toBe(4);
+  const made = (await getDocs('orders')).find((o) => o.color === 'Vàng');
+  expect(made.price).toBe(380000);
+});
+
+test('Lên đơn: a price Mẹ typed stays when she picks the customer afterwards', async ({ page }) => {
+  await putDoc('orders', 'o-new', { id: 'o-new', date: '2026-10-01', deliver: '2026-10-01', customerId: CUST.id, customer: CUST.name, product: 'DAU-0.5', color: 'Đỏ', cartons: 1, price: 380000, status: 'Đã giao', by: 'Excel', void: false });
+  await openAs(page, OWNER);
+  await page.goto('/#/don/moi');
+  await page.getByRole('button', { name: 'Sửa giá' }).click();
+  const in1L = page.getByRole('textbox', { name: 'Giá mỗi thùng 1L', exact: true });
+  await in1L.fill('400000');
+  await page.locator('#od-q').fill('Khach Thu');
+  await page.locator('#od-q').press('Enter');
+  await expect(in1L).toHaveValue('400.000');
+});
+
+test('candles count in hộp and vỉ on Sản xuất and Đơn hàng, but stay in thùng on Kho', async ({ page }) => {
+  await openAs(page, WORKER);
+  await page.goto('/#/sx');
+  await page.locator('details.more summary').click();
+  await page.getByRole('button', { name: 'Nến sáp hồng' }).click();
+  await expect(page.locator('h2.sec').first()).toHaveText('3. Bao nhiêu hộp?');
+  await expect(page.getByRole('button', { name: 'Thêm 1 hộp' })).toBeVisible();
+  await page.locator('#sx-n').fill('4');
+  await page.getByRole('button', { name: 'Lưu hàng' }).click();
+  await expect(page.locator('.toast')).toContainText('Đã lưu 4 hộp Nến sáp hồng');
+  await expect(page.locator('.ledger .row', { hasText: 'Nến sáp hồng' })).toContainText('hộp');
+  await expect(page.locator('.band .sub')).toContainText('đã ghi 4 hộp');
+
+  await page.goto('/#/don/moi');
+  await page.locator('#od-q').fill('Khach Thu');
+  await page.locator('#od-q').press('Enter');
+  await page.getByRole('textbox', { name: '1L Đỏ, số thùng', exact: true }).fill('2');
+  await page.locator('details.more summary').click();
+  await page.getByRole('textbox', { name: 'Nến tealight, số vỉ', exact: true }).fill('3');
+  await expect(page.locator('#od-sum')).toContainText('3 vỉ × 300.000');
+  await expect(page.locator('#od-bar')).toContainText('Kho thiếu 3 vỉ Nến tealight');
+  await page.getByRole('textbox', { name: 'Nến tealight, số vỉ', exact: true }).fill('');
+  await expect(page.locator('#od-bar')).toContainText('Khách Thử · 2 thùng');
+  await page.getByRole('textbox', { name: 'Nến tealight, số vỉ', exact: true }).fill('3');
+  await page.getByRole('button', { name: 'Lưu đơn' }).click();
+  await page.getByRole('button', { name: 'Vẫn lưu đơn' }).click();
+  await expect(page).toHaveURL(/#\/hoadon\//);
+  await expect(page.locator('.bill-line', { hasText: 'vỉ' })).toHaveText('3 vỉ × 300.000');
+  await expect(page.locator('.ledger.sum')).toContainText('2 thùng, 3 vỉ');
+
+  await page.goto('/#/kho');
+  await expect(page.locator('.ledger .row', { hasText: 'Nến sáp hồng' })).toContainText('thùng');
+  await expect(page.locator('main')).not.toContainText('hộp');
+  await expect(page.locator('main')).not.toContainText(' vỉ');
 });
 
 test('the font comes from the app itself, never from another site', async ({ page }) => {
